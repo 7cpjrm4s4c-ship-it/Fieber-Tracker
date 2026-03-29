@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fieber Tracker">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Fieber Tracker">
+<meta name="description" content="Professionelle Fieberdaten-Erfassung für Kinder">
+<title>Fieber Tracker</title>
+<script>
+// ── PWA SETUP ─────────────────────────────────────────────────────────────
+// Link manifest (already in <head> via <link rel="manifest">)
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(r => console.log('SW registered:', r.scope))
+    .catch(() => { /* Offline-Cache nicht verfügbar */ });
+}
+</script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+/* ════════════════════════════════════════════════════════
+   FIEBER TRACKER  —  Liquid Glass Dark Mode
+   Hintergrund: #000000  |  Glas-Oberflächen mit Blur
+   ════════════════════════════════════════════════════════ */
+:root {
+  /* Base */
+  --bg:         #000000;
+  --text:       #ffffff;
+  --text-sec:   rgba(255,255,255,.75);
+  --muted:      rgba(255,255,255,.45);
+  --faint:      rgba(255,255,255,.22);
+
+  /* Liquid Glass surfaces */
+  --glass:      rgba(255,255,255,.09);
+  --glass-mid:  rgba(255,255,255,.13);
+  --glass-hi:   rgba(255,255,255,.18);
+  --glass-border: rgba(255,255,255,.16);
+  --glass-border-hi: rgba(255,255,255,.32);
+
+  /* Input fields */
+  --input-bg:   rgba(255,255,255,.07);
+  --input-border: rgba(255,255,255,.14);
+  --input-focus-border: rgba(255,255,255,.55);
+  --input-focus-glow: rgba(255,255,255,.08);
+
+  /* Accent — warm red, stays vivid on black */
+  --accent:        #ff5c3a;
+  --accent-dim:    rgba(255,92,58,.25);
+  --accent-glow:   rgba(255,92,58,.18);
+
+  /* Semantic colours — bright enough on black */
+  --green:      #34d399;  --green-bg:  rgba(52,211,153,.15);
+  --yellow:     #fbbf24;  --yellow-bg: rgba(251,191,36,.15);
+  --red:        #f87171;  --red-bg:    rgba(248,113,113,.15);
+
+  /* Shape */
+  --radius:    18px;
+  --radius-sm: 12px;
+  --radius-xs: 8px;
+
+  /* Shadows — glow-style for dark bg */
+  --shadow:    0 4px 24px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.06) inset;
+  --shadow-md: 0 8px 40px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.08) inset;
+  --shadow-glow: 0 0 0 1px rgba(255,255,255,.1), 0 4px 24px rgba(0,0,0,.5);
+}
+
+/* ── RESET & BASE ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body {
+  font-family: -apple-system,'SF Pro Display','SF Pro Text',
+               'Helvetica Neue',sans-serif;
+  background: #000;
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 56px;
+  /* Subtle radial glow at top for depth */
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% -10%,
+      rgba(255,92,58,.08) 0%, transparent 70%);
+}
+
+/* ── HEADER ── */
+header {
+  background: rgba(10,10,10,.72);
+  backdrop-filter: saturate(180%) blur(28px);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  padding: 16px 20px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.hdr { max-width:700px;margin:0 auto;display:flex;align-items:center;gap:13px }
+.logo-icon {
+  width: 38px; height: 38px;
+  background: linear-gradient(145deg, #ff6b4a, #e63920);
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(255,92,58,.4),
+              0 1px 0 rgba(255,255,255,.2) inset;
+}
+.logo h1 {
+  font-size: 18px; font-weight: 600; letter-spacing: -.4px;
+  color: var(--text);
+}
+.logo p {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: .5px; text-transform: uppercase; margin-top: 1px;
+}
+
+/* ── MAIN ── */
+main { max-width:700px;margin:0 auto;padding:18px 14px 0 }
+
+/* ── CHILDREN BAR ── */
+.cbar {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 16px; overflow-x: auto;
+  padding-bottom: 3px; -webkit-overflow-scrolling: touch;
+}
+.cbar::-webkit-scrollbar { height: 2px }
+.cbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px }
+
+.ctab {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--text-sec);
+  cursor: pointer;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  white-space: nowrap;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.ctab:hover {
+  background: var(--glass-mid);
+  border-color: var(--glass-border-hi);
+  color: var(--text);
+}
+.ctab.active {
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.35);
+  color: var(--text);
+  box-shadow: 0 2px 12px rgba(0,0,0,.4),
+              0 1px 0 rgba(255,255,255,.2) inset;
+}
+.ctab .av {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; flex-shrink: 0;
+}
+.cdel {
+  opacity: 0; width: 15px; height: 15px; border-radius: 50%;
+  background: rgba(255,255,255,.12); color: rgba(255,255,255,.6);
+  border: none; font-size: 9px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .15s; margin-left: 1px; padding: 0;
+}
+.ctab:hover .cdel { opacity: 1 }
+.ctab.active .cdel { opacity: .7 }
+.ctab.active .cdel:hover { opacity: 1; background: rgba(255,255,255,.2) }
+
+.btn-add-c {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px dashed rgba(255,255,255,.22);
+  border-radius: 20px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--muted); cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.btn-add-c:hover { border-color: var(--accent); color: var(--accent) }
+
+/* ── VIEW TABS (Segmented Control) ── */
+.vtabs {
+  display: flex;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 4px; gap: 3px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.vtab {
+  flex: 1; padding: 9px 10px;
+  border: none; background: transparent;
+  border-radius: calc(var(--radius) - 5px);
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--muted); cursor: pointer;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  text-align: center;
+}
+.vtab.active {
+  background: rgba(255,255,255,.16);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5),
+              0 1px 0 rgba(255,255,255,.18) inset;
+  border-radius: calc(var(--radius) - 5px);
+}
+
+/* ── GLASS CARD ── */
+.card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 12px;
+  position: relative;
+}
+/* Top-edge highlight */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 12px; right: 12px; height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(255,255,255,.25) 40%,
+    rgba(255,255,255,.25) 60%, transparent);
+  pointer-events: none;
+}
+.card-hdr {
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex; align-items: center; gap: 10px;
+}
+.chicon {
+  width: 30px; height: 30px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: var(--radius-xs);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.card-hdr h2 {
+  font-size: 15px; font-weight: 600; letter-spacing: -.2px;
+}
+.cbody { padding: 16px 18px }
+
+/* ── FORM ── */
+.fg2 { display:grid;grid-template-columns:1fr 1fr;gap:11px }
+.fg3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px }
+.fg  { display:flex;flex-direction:column;gap:6px }
+
+label {
+  font-size: 11px; font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: .9px;
+}
+
+input, select {
+  font-family: inherit; font-size: 15px;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  outline: none;
+  transition: all .2s;
+  -webkit-appearance: none; appearance: none;
+  width: 100%;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+input:focus, select:focus {
+  border-color: var(--input-focus-border);
+  background: rgba(255,255,255,.11);
+  box-shadow: 0 0 0 3px var(--input-focus-glow),
+              0 1px 0 rgba(255,255,255,.12) inset;
+}
+input::placeholder { color: rgba(255,255,255,.28) }
+
+/* Date/time inputs — force white text on iOS */
+input[type="date"], input[type="time"] { color-scheme: dark }
+
+.sw { position: relative }
+.sw::after {
+  content: '▾'; position: absolute;
+  right: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none; font-size: 13px;
+}
+select { padding-right: 30px; cursor: pointer; color-scheme: dark }
+
+.tw { position: relative }
+.tw input { font-size: 19px; font-weight: 500; padding-right: 42px; letter-spacing: -.5px }
+.tu {
+  position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 14px; font-weight: 500;
+}
+
+/* Temp badges */
+.tbadge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 14px;
+  font-size: 11px; font-weight: 600;
+}
+.tn { background: var(--green-bg);  color: var(--green) }
+.te { background: var(--yellow-bg); color: var(--yellow) }
+.tf { background: var(--red-bg);    color: var(--red) }
+
+/* Save button */
+.btn-save {
+  width: 100%; padding: 14px;
+  background: linear-gradient(145deg,
+    rgba(255,100,60,.9), rgba(220,50,20,.95));
+  color: #fff; border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; margin-top: 8px;
+  transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(255,92,58,.35),
+              0 1px 0 rgba(255,255,255,.15) inset;
+  letter-spacing: -.1px;
+}
+.btn-save:hover {
+  background: linear-gradient(145deg,
+    rgba(255,120,80,.95), rgba(240,60,25,1));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(255,92,58,.5),
+              0 1px 0 rgba(255,255,255,.2) inset;
+}
+.btn-save:active { transform: translateY(0); box-shadow: 0 2px 10px rgba(255,92,58,.3) }
+
+/* ── STATS ── */
+.stats { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px }
+.stat {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 10px;
+  text-align: center;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow);
+  position: relative; overflow: hidden;
+}
+.stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 20%; right: 20%; height: 1px;
+  background: linear-gradient(90deg, transparent,
+    rgba(255,255,255,.22), transparent);
+}
+.stat b {
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -.6px; display: block; line-height: 1.1;
+  color: var(--text);
+}
+.stat small {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin-top: 4px; display: block;
+}
+
+/* ── LIST TOOLBAR ── */
+.list-tb {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 16px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.list-tb span { font-size: 12px; color: var(--muted); font-weight: 500 }
+.tbr { display:flex; gap:7px }
+.bsec {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 13px; border-radius: var(--radius-xs);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .18s;
+}
+.bdark {
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.2);
+  color: var(--text);
+}
+.bdark:hover {
+  background: var(--accent);
+  border-color: transparent;
+  box-shadow: 0 2px 12px var(--accent-dim);
+}
+.bghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.14);
+  color: var(--muted);
+}
+.bghost:hover { border-color: var(--red); color: var(--red) }
+
+/* ── ENTRY LIST ── */
+.elist { padding: 7px 10px 10px }
+.ei {
+  display: flex; align-items: stretch;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--radius-sm);
+  margin-bottom: 7px; overflow: hidden;
+  transition: all .2s;
+  animation: sIn .22s cubic-bezier(.4,0,.2,1);
+}
+@keyframes sIn {
+  from { opacity:0; transform:translateY(-6px) scale(.99) }
+  to   { opacity:1; transform:translateY(0)    scale(1) }
+}
+.ei:hover {
+  background: rgba(255,255,255,.09);
+  border-color: rgba(255,255,255,.18);
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.ebar { width: 4px; flex-shrink: 0 }
+.bg { background: var(--green) }
+.by { background: var(--yellow) }
+.br { background: var(--red) }
+.ec { flex:1; padding:10px 12px }
+.etop { display:flex;align-items:center;justify-content:space-between;margin-bottom:6px }
+.etemp {
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -1px; line-height: 1;
+}
+.etime { font-size: 11px; color: var(--muted); font-weight: 500; text-align: right }
+.ebot { display:flex;align-items:center;gap:5px;flex-wrap:wrap }
+.ep {
+  font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 8px;
+  background: rgba(255,255,255,.1);
+  color: var(--text-sec);
+  border: 1px solid rgba(255,255,255,.1);
+}
+.ep.med  { background: rgba(180,140,255,.15); color: #c4aaff; border-color: rgba(180,140,255,.2) }
+.ep.dose { background: rgba(100,180,255,.15); color: #93d0ff; border-color: rgba(100,180,255,.2) }
+.edel {
+  padding: 0 12px; background: transparent; border: none;
+  color: rgba(255,255,255,.25); cursor: pointer; font-size: 13px;
+  display: flex; align-items: center;
+  transition: color .18s; flex-shrink: 0;
+}
+.edel:hover { color: var(--red) }
+
+/* ── EMPTY STATE ── */
+.empty { text-align:center;padding:44px 20px;color:var(--muted) }
+.empty span { font-size:38px;display:block;opacity:.25;margin-bottom:10px }
+.empty h3 { font-size:17px;font-weight:600;color:var(--text-sec);margin-bottom:5px }
+.empty p  { font-size:13px }
+
+/* ── NO CHILD STATE ── */
+.nochild { text-align:center;padding:60px 20px }
+.nochild span { font-size:52px;display:block;margin-bottom:14px;opacity:.2 }
+.nochild h3 { font-size:20px;font-weight:600;color:var(--text);margin-bottom:7px }
+.nochild p  { font-size:13px;color:var(--muted);margin-bottom:22px }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 13px 24px;
+  background: linear-gradient(145deg, rgba(255,100,60,.9), rgba(220,50,20,.95));
+  color: #fff; border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+  box-shadow: 0 4px 20px rgba(255,92,58,.35),
+              0 1px 0 rgba(255,255,255,.15) inset;
+}
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 28px rgba(255,92,58,.5) }
+
+/* ── PANEL ── */
+.panel { display:none }.panel.active { display:block }
+
+/* ── MODAL ── */
+.mbg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 500; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.mbg.open { display:flex }
+.modal {
+  background: rgba(28,28,30,.88);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 22px;
+  padding: 28px; width: 100%; max-width: 340px;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  position: relative; overflow: hidden;
+}
+.modal::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 15%; right: 15%; height: 1px;
+  background: linear-gradient(90deg, transparent,
+    rgba(255,255,255,.3), transparent);
+}
+.modal h3 { font-size:19px;font-weight:600;letter-spacing:-.3px;margin-bottom:18px }
+.mfg { margin-bottom:13px }
+.mbtns { display:flex;gap:9px;margin-top:4px }
+.mbtn {
+  flex:1; padding:12px; border-radius:var(--radius-sm);
+  font-family:inherit;font-size:14px;font-weight:600;
+  cursor:pointer;border:none;transition:all .18s;
+}
+.mbtn.ok {
+  background: linear-gradient(145deg, rgba(255,100,60,.9), rgba(220,50,20,.95));
+  color:#fff;
+  box-shadow: 0 3px 14px rgba(255,92,58,.3), 0 1px 0 rgba(255,255,255,.12) inset;
+}
+.mbtn.ok:hover { box-shadow: 0 4px 20px rgba(255,92,58,.5) }
+.mbtn.no {
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.14);
+  color: var(--text-sec);
+}
+.mbtn.no:hover { background: rgba(255,255,255,.16) }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom:28px; left:50%;
+  transform: translateX(-50%) translateY(88px);
+  background: rgba(30,30,32,.92);
+  border: 1px solid rgba(255,255,255,.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text); padding: 12px 22px;
+  border-radius: 28px; font-size:13px; font-weight:500;
+  z-index:600;
+  transition: transform .32s cubic-bezier(.34,1.56,.64,1);
+  box-shadow: var(--shadow-md); white-space:nowrap;
+}
+.toast.show { transform:translateX(-50%) translateY(0) }
+
+/* ── AVATAR TINTS (readable on dark) ── */
+.av0 { background:rgba(255,92,58,.25);  color:#ff8c70 }
+.av1 { background:rgba(100,180,255,.2); color:#7bc8ff }
+.av2 { background:rgba(52,211,153,.2);  color:#6ee7b7 }
+.av3 { background:rgba(167,139,250,.2); color:#c4aaff }
+.av4 { background:rgba(251,191,36,.2);  color:#fcd34d }
+.av5 { background:rgba(248,113,113,.2); color:#fca5a5 }
+
+/* ── RESPONSIVE ── */
+@media(max-width:480px){
+  .fg2,.fg3 { grid-template-columns:1fr }
+  .stats { grid-template-columns:1fr 1fr }
+}
+</style>
+
+<style>
+/* ── PRINT STYLES  —  A4 Querformat Tabelle (light for paper) ── */
+@media print {
+  @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
+  body > * { display:none !important; }
+  #print-page { display:block !important; }
+  #print-page { font-family:-apple-system,'Helvetica Neue',sans-serif;font-size:8.5pt;color:#1a1410;background:#fff; }
+  .ph { display:flex;align-items:flex-start;justify-content:space-between;background:#1a1410 !important;color:#fff;padding:5mm 4mm;margin:0 0 3mm;border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .ph-left { display:flex;align-items:center;gap:8px; }
+  .ph-badge { width:10mm;height:10mm;background:#ff5c3a !important;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:14pt;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .ph-title { font-size:15pt;font-weight:600;color:#fff; }
+  .ph-sub { font-size:7pt;color:rgba(255,255,255,.5);letter-spacing:.6px;text-transform:uppercase;margin-top:2px; }
+  .ph-right { text-align:right; }
+  .ph-name { font-size:11pt;font-weight:600;color:#fff; }
+  .ph-meta { font-size:7pt;color:rgba(255,255,255,.5);margin-top:3px; }
+  .ps { display:flex;border:1pt solid #ddd;border-radius:3px;overflow:hidden;margin-bottom:4mm;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .ps-item { flex:1;padding:3mm 2mm;text-align:center;background:#f5f0eb !important;border-right:1pt solid #ddd;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .ps-item:last-child { border-right:none; }
+  .ps-val { font-size:12pt;font-weight:700;display:block; }
+  .ps-lbl { font-size:6.5pt;color:#7a6e66;text-transform:uppercase;letter-spacing:.7px;margin-top:1px;display:block; }
+  .pt { width:100%;border-collapse:collapse;font-size:8pt;page-break-inside:auto; }
+  .pt thead tr { background:#1a1410 !important;color:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .pt thead th { padding:3mm 2mm;text-align:left;font-size:7.5pt;font-weight:600;white-space:nowrap;border:none;color:#fff !important; }
+  .pt thead th.num { text-align:center; }
+  .pt tbody tr { page-break-inside:avoid; }
+  .pt tbody tr:nth-child(even) { background:#f4f0ec !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .pt tbody tr:nth-child(odd)  { background:#faf8f6 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .pt td { padding:2.5mm 2mm;border-bottom:.3pt solid #e0d8d0;vertical-align:middle; }
+  .pt td.num  { text-align:center;color:#9a8e86;font-size:7.5pt; }
+  .pt td.temp { font-weight:700;text-align:center; }
+  .pt td.gr { color:#2d6a4f !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .pt td.ye { color:#a16207 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .pt td.re { color:#c0392b !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  .pt td.note { font-size:7.5pt;color:#5a5050; }
+  .pf { margin-top:4mm;padding-top:2mm;border-top:.5pt solid #ccc;display:flex;justify-content:space-between;font-size:6.5pt;color:#999;page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr">
+    <div class="logo-icon">🌡️</div>
+    <div class="logo">
+      <h1>Fieber Tracker</h1>
+      <p>Temperatur · Medikamente · Verlauf</p>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- CHILDREN BAR -->
+  <div class="cbar" id="cbar"></div>
+
+  <!-- NO CHILD -->
+  <div id="noChild" class="nochild">
+    <span>👶</span>
+    <h3>Noch kein Kind angelegt</h3>
+    <p>Füge ein Kind hinzu, um mit der Erfassung zu beginnen.</p>
+    <button class="btn-primary" onclick="openAddChild()">➕ Kind hinzufügen</button>
+  </div>
+
+  <!-- CHILD CONTENT -->
+  <div id="childContent" style="display:none">
+
+    <div class="vtabs">
+      <button class="vtab active" onclick="switchView('eingabe',this)">📝 Erfassung</button>
+      <button class="vtab" onclick="switchView('verlauf',this)">📋 Verlauf</button>
+    </div>
+
+    <!-- EINGABE -->
+    <div class="panel active" id="panel-eingabe">
+
+      <div class="card">
+        <div class="card-hdr"><div class="chicon">🌡️</div><h2>Messung</h2></div>
+        <div class="cbody">
+          <div class="fg2">
+            <div class="fg">
+              <label>Temperatur</label>
+              <div class="tw">
+                <input type="number" id="i-temp" min="34" max="42.5" step="0.1" placeholder="36,0" autocomplete="off" oninput="onTempInput()">
+                <span class="tu">°C</span>
+              </div>
+              <div id="tprev" style="min-height:20px;margin-top:1px"></div>
+            </div>
+            <div class="fg">
+              <label>Uhrzeit</label>
+              <input type="time" id="i-time">
+            </div>
+            <div class="fg">
+              <label>Datum</label>
+              <input type="date" id="i-date">
+            </div>
+            <div class="fg">
+              <label>Messort</label>
+              <div class="sw"><select id="i-site">
+                <option>Rektal</option>
+                <option>Axillar (Achsel)</option>
+                <option>Oral</option>
+                <option>Ohr</option>
+                <option>Stirn</option>
+              </select></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><div class="chicon">💊</div><h2>Fiebermittel</h2></div>
+        <div class="cbody">
+          <div class="fg3">
+            <div class="fg">
+              <label>Mittel</label>
+              <div class="sw"><select id="i-med" onchange="onMedChange()">
+                <option value="Keines">Keines</option>
+                <option value="Zäpfchen">Zäpfchen</option>
+                <option value="Saft">Saft</option>
+              </select></div>
+            </div>
+            <div class="fg">
+              <label>Menge</label>
+              <div class="sw"><select id="i-dose" disabled><option value="—">—</option></select></div>
+            </div>
+            <div class="fg">
+              <label>Wirkstoff</label>
+              <div class="sw"><select id="i-active" disabled><option value="—">—</option></select></div>
+            </div>
+          </div>
+          <div id="med-note" style="font-size:12px;color:var(--muted);padding-top:9px;min-height:18px;letter-spacing:.1px"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><div class="chicon">📝</div><h2>Notiz (optional)</h2></div>
+        <div class="cbody">
+          <div class="fg">
+            <textarea id="i-note" placeholder="Symptome, Befinden, Beobachtungen…" rows="3"
+              style="width:100%;font-family:inherit;font-size:14px;color:var(--text);background:var(--input-bg);border:1px solid var(--input-border);border-radius:var(--radius-sm);padding:10px 12px;outline:none;resize:vertical;transition:all .2s;color-scheme:dark"
+              onfocus="this.style.borderColor='rgba(255,255,255,.55)';this.style.background='rgba(255,255,255,.11)'"
+              onblur="this.style.borderColor='var(--input-border)';this.style.background='var(--input-bg)'"></textarea>
+          </div>
+          <button class="btn-save" onclick="saveEntry()">➕ Eintrag speichern</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- VERLAUF -->
+    <div class="panel" id="panel-verlauf">
+      <div class="stats">
+        <div class="stat"><b id="s-count">0</b><small>Messungen</small></div>
+        <div class="stat"><b id="s-max">—</b><small>Höchst °C</small></div>
+        <div class="stat"><b id="s-avg">—</b><small>Ø Temp °C</small></div>
+      </div>
+      <div class="card">
+        <div class="list-tb">
+          <span id="lcount">0 Einträge</span>
+          <div class="tbr">
+            <button class="bsec bghost" onclick="clearChild()">🗑 Leeren</button>
+            <button class="bsec bdark" onclick="exportPDF()">📄 PDF Export</button>
+          </div>
+        </div>
+        <div id="elist"></div>
+      </div>
+    </div>
+
+  </div><!-- /childContent -->
+
+</main>
+
+<!-- ADD CHILD MODAL -->
+<div class="mbg" id="modal-add">
+  <div class="modal">
+    <h3>Kind hinzufügen</h3>
+    <div class="fg mfg"><label>Name</label><input type="text" id="m-name" placeholder="z.B. Lena" autocomplete="off" maxlength="30"></div>
+    <div class="fg mfg"><label>Geburtsdatum (optional)</label><input type="date" id="m-dob"></div>
+    <div class="mbtns">
+      <button class="mbtn no" onclick="closeModal()">Abbrechen</button>
+      <button class="mbtn ok" onclick="confirmAdd()">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- PRINT PAGE - only visible when printing / Als PDF speichern -->
+<div id="print-page" style="display:none"></div>
+
+<script>
+// ══════════════════════════════════
+//  STATE
+// ══════════════════════════════════
+let children = JSON.parse(localStorage.getItem('ft3_ch') || '[]');
+let activeId = null;
+
+const EMOJIS  = ['👦','👧','🧒','🐣','🌟','💛'];
+const AV_CLS  = ['av0','av1','av2','av3','av4','av5'];
+
+function save() { localStorage.setItem('ft3_ch', JSON.stringify(children)); }
+function getC(id) { return children.find(c=>c.id===id); }
+function active() { return getC(activeId); }
+
+// ── INIT
+window.onload = () => {
+  const now = new Date();
+  document.getElementById('i-time').value = now.toTimeString().slice(0,5);
+  document.getElementById('i-date').value = now.toISOString().slice(0,10);
+  document.getElementById('m-name').addEventListener('keydown', e => { if(e.key==='Enter') confirmAdd(); });
+  renderBar();
+  if (children.length) selectChild(children[0].id);
+};
+
+// ══════════════════════════════════
+//  CHILDREN BAR
+// ══════════════════════════════════
+function renderBar() {
+  const bar = document.getElementById('cbar');
+  bar.innerHTML = '';
+  children.forEach((c,i) => {
+    const avCls = AV_CLS[i % AV_CLS.length];
+    const em = EMOJIS[i % EMOJIS.length];
+    const btn = document.createElement('button');
+    btn.className = 'ctab' + (c.id===activeId?' active':'');
+    btn.innerHTML = `<span class="av ${avCls}">${em}</span>${c.name}<button class="cdel" onclick="event.stopPropagation();delChild('${c.id}')" title="Entfernen">✕</button>`;
+    btn.onclick = () => selectChild(c.id);
+    bar.appendChild(btn);
+  });
+  const add = document.createElement('button');
+  add.className='btn-add-c'; add.textContent='➕ Kind hinzufügen'; add.onclick=openAddChild;
+  bar.appendChild(add);
+  document.getElementById('noChild').style.display = children.length?'none':'block';
+  document.getElementById('childContent').style.display = children.length?'block':'none';
+}
+
+function selectChild(id) {
+  activeId = id;
+  renderBar();
+  renderVerlauf();
+}
+
+function openAddChild() {
+  document.getElementById('m-name').value='';
+  document.getElementById('m-dob').value='';
+  document.getElementById('modal-add').classList.add('open');
+  setTimeout(()=>document.getElementById('m-name').focus(),80);
+}
+
+function closeModal() { document.getElementById('modal-add').classList.remove('open'); }
+
+function confirmAdd() {
+  const name = document.getElementById('m-name').value.trim();
+  if (!name) { document.getElementById('m-name').focus(); return; }
+  const dob  = document.getElementById('m-dob').value;
+  const c = {id: Date.now().toString(), name, dob, entries:[]};
+  children.push(c); save(); closeModal(); selectChild(c.id);
+  showToast('👶 '+name+' hinzugefügt');
+}
+
+function delChild(id) {
+  const c = getC(id);
+  if (!c||!confirm('"'+c.name+'" und alle Einträge löschen?')) return;
+  children = children.filter(x=>x.id!==id); save();
+  activeId = children.length ? children[0].id : null;
+  renderBar();
+  if (activeId) renderVerlauf();
+  showToast('🗑 '+c.name+' gelöscht');
+}
+
+function clearChild() {
+  const c = active();
+  if (!c||c.entries.length===0){showToast('Keine Einträge vorhanden');return;}
+  if (!confirm('Alle Einträge von '+c.name+' löschen?')) return;
+  c.entries=[]; save(); renderVerlauf(); showToast('🗑 Einträge gelöscht');
+}
+
+// ══════════════════════════════════
+//  VIEW TABS
+// ══════════════════════════════════
+function switchView(name, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='verlauf') renderVerlauf();
+}
+
+// ══════════════════════════════════
+//  TEMP
+// ══════════════════════════════════
+function getTI(t) {
+  if (t<37.5) return {cls:'tn',bar:'bg',label:'Kein Fieber',icon:'✅'};
+  if (t<38.5) return {cls:'te',bar:'by',label:'Erhöhte Temp.',icon:'⚠️'};
+  return {cls:'tf',bar:'br',label:'Fieber',icon:'🔴'};
+}
+function onTempInput() {
+  const v = parseFloat(document.getElementById('i-temp').value);
+  const el = document.getElementById('tprev');
+  if (!v||v<34||v>42.5){el.innerHTML='';return;}
+  const i=getTI(v);
+  el.innerHTML=`<span class="tbadge ${i.cls}">${i.icon} ${i.label}</span>`;
+}
+
+// ══════════════════════════════════
+//  MED OPTIONS
+// ══════════════════════════════════
+function onMedChange() {
+  const t = document.getElementById('i-med').value;
+  const d = document.getElementById('i-dose');
+  const a = document.getElementById('i-active');
+  const n = document.getElementById('med-note');
+  d.innerHTML=a.innerHTML='';
+  if (t==='Keines') {
+    d.disabled=a.disabled=true;
+    d.innerHTML=a.innerHTML='<option value="—">—</option>';
+    n.textContent='';
+  } else {
+    d.disabled=a.disabled=false;
+    (t==='Zäpfchen'?['75 mg','125 mg','250 mg']:['2,5 ml','3,75 ml','5 ml','7,5 ml'])
+      .forEach(x=>d.innerHTML+=`<option>${x}</option>`);
+    ['Paracetamol','Ibuprofen'].forEach(x=>a.innerHTML+=`<option>${x}</option>`);
+    n.textContent = t==='Zäpfchen'?'💡 Für Kleinkinder ab 6 kg':'💡 Dosierung nach Körpergewicht';
+  }
+}
+
+// ══════════════════════════════════
+//  SAVE ENTRY
+// ══════════════════════════════════
+function saveEntry() {
+  if (!activeId){showToast('Bitte zuerst ein Kind auswählen');return;}
+  const temp = parseFloat(document.getElementById('i-temp').value);
+  const time = document.getElementById('i-time').value;
+  const date = document.getElementById('i-date').value;
+  const site = document.getElementById('i-site').value;
+  const med  = document.getElementById('i-med').value;
+  const dose = document.getElementById('i-dose').value;
+  const act  = document.getElementById('i-active').value;
+  const note = document.getElementById('i-note').value.trim();
+  if (!temp||temp<34||temp>42.5){showToast('❌ Gültige Temperatur eingeben (34–42,5°C)');return;}
+  if (!time){showToast('❌ Uhrzeit eingeben');return;}
+  if (!date){showToast('❌ Datum eingeben');return;}
+  active().entries.unshift({
+    id:Date.now(), temp, time, date, site,
+    medType:med, dose:med!=='Keines'?dose:'—', active:med!=='Keines'?act:'—', note
+  });
+  save(); showToast('✅ Eintrag gespeichert');
+  document.getElementById('i-note').value='';
+  document.getElementById('i-temp').value='';
+  document.getElementById('tprev').innerHTML='';
+  const now=new Date();
+  document.getElementById('i-time').value=now.toTimeString().slice(0,5);
+  document.getElementById('i-date').value=now.toISOString().slice(0,10);
+}
+
+// ══════════════════════════════════
+//  RENDER VERLAUF
+// ══════════════════════════════════
+function renderVerlauf() {
+  const c = active(); if (!c) return;
+  const entries = c.entries, n = entries.length;
+  document.getElementById('lcount').textContent = n+(n===1?' Eintrag':' Einträge');
+  document.getElementById('s-count').textContent = n;
+  if (n===0) {
+    document.getElementById('s-max').textContent='—';
+    document.getElementById('s-avg').textContent='—';
+    document.getElementById('elist').innerHTML=`<div class="empty"><span>🌡️</span><h3>Noch keine Messungen</h3><p>Erfasse die erste Temperaturmessung im Tab „Erfassung".</p></div>`;
+    return;
+  }
+  const temps=entries.map(e=>e.temp);
+  document.getElementById('s-max').textContent=Math.max(...temps).toFixed(1);
+  document.getElementById('s-avg').textContent=(temps.reduce((a,b)=>a+b,0)/n).toFixed(1);
+  const sorted=[...entries].sort((a,b)=>new Date(b.date+'T'+b.time)-new Date(a.date+'T'+a.time));
+  document.getElementById('elist').innerHTML='<div class="elist">'+sorted.map(e=>{
+    const info=getTI(e.temp);
+    const ds=new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const meds=e.medType!=='Keines'
+      ?`<span class="ep med">💊 ${e.medType}</span><span class="ep dose">${e.dose}</span><span class="ep">${e.active}</span>`
+      :`<span class="ep">Kein Fiebermittel</span>`;
+    const np=e.note?`<span class="ep" style="background:#eef2ff;color:#3b5bdb" title="${e.note}">📝 Notiz</span>`:'';
+    return `<div class="ei">
+      <div class="ebar ${info.bar}"></div>
+      <div class="ec">
+        <div class="etop">
+          <span class="etemp">${e.temp.toFixed(1)}°C</span>
+          <div><div class="etime">${ds} · ${e.time} Uhr</div>
+          <span class="tbadge ${info.cls}" style="margin-top:3px;display:inline-flex">${info.icon} ${info.label}</span></div>
+        </div>
+        <div class="ebot"><span class="ep">📍 ${e.site}</span>${meds}${np}</div>
+      </div>
+      <button class="edel" onclick="delEntry(${e.id})">✕</button>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function delEntry(id) {
+  const c=active(); c.entries=c.entries.filter(e=>e.id!==id);
+  save(); renderVerlauf(); showToast('🗑 Eintrag gelöscht');
+}
+
+// ══════════════════════════════════
+//  TOAST
+// ══════════════════════════════════
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+// ══════════════════════════════════
+//  PDF EXPORT  —  A4 Querformat
+// ══════════════════════════════════
+function exportPDF() {
+  const c = active();
+  if (!c||c.entries.length===0){showToast('Keine Daten zum Exportieren');return;}
+
+  const {jsPDF} = window.jspdf;
+  // A4 landscape: 297 × 210 mm
+  const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+
+  const PW=297, PH=210, ML=12, MR=12;
+  const CW = PW-ML-MR;   // 273 mm usable width
+  const HDR_H = 26, FOOT_H = 11;
+  const now = new Date();
+
+  // colours
+  const K = {
+    dark:[26,20,16], acc:[200,75,47], mut:[120,110,100],
+    lt:[205,196,186], bg:[245,240,235], wh:[255,255,255],
+    gr:[45,106,79], ye:[180,110,10], re:[192,57,43],
+    gbg:[232,244,240], ybg:[254,243,226], rbg:[253,232,230],
+    r1:[252,250,248], r2:[245,241,237],
+  };
+  const F = c=>doc.setFillColor(...c);
+  const T = c=>doc.setTextColor(...c);
+  const S = c=>doc.setDrawColor(...c);
+
+  const exportStr = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    +', '+now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';
+  const dobStr = c.dob
+    ? new Date(c.dob+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    : '';
+
+  function drawHeader(pg, tot) {
+    F(K.dark); doc.rect(0,0,PW,HDR_H,'F');
+    F(K.acc);  doc.roundedRect(ML,6,12,12,2,2,'F');
+    T(K.wh); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text('Fieber Tracker', ML+16, 14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    T([180,170,160]);
+    doc.text('Temperatur  \u00B7  Medikamente  \u00B7  Verlauf', ML+16, 20);
+    // right side: name, dob, export, page
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    T(K.wh); doc.text(c.name, PW-MR, 13, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    T([180,170,160]);
+    let ry = 19;
+    if (dobStr) { doc.text('Geb.: '+dobStr, PW-MR, ry, {align:'right'}); ry+=5; }
+    doc.text('Export: '+exportStr+'   Seite '+pg+' / '+tot, PW-MR, ry, {align:'right'});
+  }
+
+  function drawFooter() {
+    F(K.bg); doc.rect(0,PH-FOOT_H,PW,FOOT_H,'F');
+    S(K.lt); doc.setLineWidth(0.25); doc.line(0,PH-FOOT_H,PW,PH-FOOT_H);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); T(K.mut);
+    doc.text('Vertrauliches Medizinisches Dokument  \u00B7  Fieber Tracker', ML, PH-3.5);
+    doc.text('Dieses Protokoll ersetzt keine \u00e4rztliche Diagnose oder Behandlung.', PW-MR, PH-3.5, {align:'right'});
+  }
+
+  // stats bar (only first page, drawn manually before autoTable)
+  function drawStats(entries, y) {
+    const temps=entries.map(e=>e.temp);
+    const maxT=Math.max(...temps).toFixed(1);
+    const avgT=(temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1);
+    const s2=[...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+    const d1=new Date(s2[0].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const d2=s2.length>1?new Date(s2[s2.length-1].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):d1;
+    const zeitr=s2.length>1?d1+' \u2013 '+d2:d1;
+    const stats=[
+      {v:String(entries.length),l:'Messungen'},
+      {v:maxT+' \u00B0C',l:'H\u00f6chstwert'},
+      {v:avgT+' \u00B0C',l:'Durchschnitt'},
+      {v:zeitr,l:'Zeitraum'},
+    ];
+    F(K.bg); doc.roundedRect(ML,y,CW,15,2,2,'F');
+    S(K.lt); doc.setLineWidth(0.2); doc.roundedRect(ML,y,CW,15,2,2,'S');
+    const sw=CW/4;
+    stats.forEach((s,i)=>{
+      const cx=ML+i*sw+sw/2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); T(K.dark);
+      doc.text(s.v,cx,y+7,{align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); T(K.mut);
+      doc.text(s.l.toUpperCase(),cx,y+12,{align:'center'});
+      if(i<3){S(K.lt);doc.setLineWidth(0.2);doc.line(ML+(i+1)*sw,y+3,ML+(i+1)*sw,y+12);}
+    });
+    return y+20;
+  }
+
+  // Build table data
+  const sorted=[...c.entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+  const head=[['#','Datum','Uhrzeit','Temp. °C','Bewertung','Messort','Mittel','Menge','Wirkstoff','Notiz']];
+  const body=sorted.map((e,i)=>{
+    const ds=new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    return [String(i+1), ds, e.time+' Uhr', e.temp.toFixed(1),
+      getTI(e.temp).label, e.site, e.medType, e.dose, e.active, e.note||''];
+  });
+
+  // Draw first page header + stats placeholder
+  drawHeader(1,1);
+  const startY = drawStats(c.entries, HDR_H+2);
+
+  // Column widths — must sum to CW = 273
+  // #(7) Datum(22) Uhrzeit(19) Temp(16) Bewertung(28) Messort(26) Mittel(20) Menge(18) Wirkstoff(24) Notiz(rest=93)
+  const CWS = [7,22,19,16,28,26,20,18,24,93];
+
+  doc.autoTable({
+    startY,
+    head,
+    body,
+    margin:{left:ML, right:MR, bottom:FOOT_H+2},
+    tableWidth: CW,
+    styles:{
+      font:'helvetica', fontSize:8.5,
+      cellPadding:{top:3.5,bottom:3.5,left:2.5,right:2.5},
+      lineColor:K.lt, lineWidth:0.25,
+      textColor:K.dark, overflow:'linebreak',
+    },
+    headStyles:{
+      fillColor:K.dark, textColor:K.wh,
+      fontStyle:'bold', fontSize:7.5,
+      cellPadding:{top:4,bottom:4,left:2.5,right:2.5},
+    },
+    alternateRowStyles:{fillColor:K.r2},
+    bodyStyles:{fillColor:K.r1},
+    columnStyles:{
+      0:{cellWidth:CWS[0],halign:'center',textColor:K.mut,fontSize:7},
+      1:{cellWidth:CWS[1]},
+      2:{cellWidth:CWS[2]},
+      3:{cellWidth:CWS[3],fontStyle:'bold',halign:'center'},
+      4:{cellWidth:CWS[4]},
+      5:{cellWidth:CWS[5]},
+      6:{cellWidth:CWS[6]},
+      7:{cellWidth:CWS[7]},
+      8:{cellWidth:CWS[8]},
+      9:{cellWidth:CWS[9],fontSize:7.5},
+    },
+    didParseCell(d){
+      if(d.section!=='body') return;
+      if(d.column.index===3){
+        const t=parseFloat(d.cell.raw);
+        d.cell.styles.textColor = t>=38.5?K.re:t>=37.5?K.ye:K.gr;
+      }
+      if(d.column.index===4){
+        const v=d.cell.raw;
+        d.cell.styles.textColor = v==='Fieber'?K.re:v==='Erhöhte Temp.'?K.ye:K.gr;
+      }
+    },
+    // Suppress autoTable's own header on first page (we drew it manually)
+    // On subsequent pages didDrawPage fires first
+    didDrawPage(data){
+      const pg = data.pageNumber;
+      const tot = doc.internal.getNumberOfPages();
+      drawHeader(pg, tot);
+      drawFooter();
+    },
+  });
+
+  // Patch correct total pages into all headers
+  const total = doc.internal.getNumberOfPages();
+  for(let p=1;p<=total;p++){
+    doc.setPage(p);
+    drawHeader(p,total);
+    drawFooter();
+    // Re-draw stats on page 1 (autoTable may have drawn over it — it hasn't, but belt+suspenders)
+    if(p===1) drawStats(c.entries, HDR_H+2);
+  }
+
+  const fname = c.name.replace(/\s+/g,'_')+'_Fieber_Protokoll_'+now.toISOString().slice(0,10)+'.pdf';
+  doc.save(fname);
+  showToast('📄 PDF für '+c.name+' exportiert');
+}
+
+// ══════════════════════════════════
+//  BUILD PRINT PAGE
+// ══════════════════════════════════
+function buildPrintPage() {
+  const c = active();
+  const pp = document.getElementById('print-page');
+  if (!c || c.entries.length === 0) { pp.innerHTML = ''; return; }
+
+  const now = new Date();
+  const exportStr = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    + ', ' + now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+  const dobStr = c.dob
+    ? new Date(c.dob+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    : '';
+
+  const entries = c.entries;
+  const temps   = entries.map(e => e.temp);
+  const maxT    = Math.max(...temps).toFixed(1);
+  const avgT    = (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1);
+  const s2      = [...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+  const d1      = new Date(s2[0].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const d2      = s2.length>1 ? new Date(s2[s2.length-1].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : d1;
+  const zeitr   = s2.length>1 ? d1+' – '+d2 : d1;
+
+  const sorted = [...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+
+  const rows = sorted.map((e,i) => {
+    const info = getTI(e.temp);
+    const colorCls = e.temp>=38.5?'re':e.temp>=37.5?'ye':'gr';
+    const ds = new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const med = e.medType !== 'Keines'
+      ? `${e.medType} &middot; ${e.dose} &middot; ${e.active}`
+      : '<span style="color:#aaa">Keines</span>';
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td>${ds}</td>
+      <td>${e.time} Uhr</td>
+      <td class="temp ${colorCls}">${e.temp.toFixed(1)} &deg;C</td>
+      <td class="${colorCls}">${info.label}</td>
+      <td>${e.site}</td>
+      <td>${e.medType !== 'Keines' ? e.medType : '<span style=\'color:#aaa\'>—</span>'}</td>
+      <td>${e.medType !== 'Keines' ? e.dose : '—'}</td>
+      <td>${e.medType !== 'Keines' ? e.active : '—'}</td>
+      <td class="note">${e.note || ''}</td>
+    </tr>`;
+  }).join('');
+
+  pp.innerHTML = `
+    <div class="ph">
+      <div class="ph-left">
+        <div class="ph-badge">&#127777;&#65039;</div>
+        <div>
+          <div class="ph-title">Fieber Tracker</div>
+          <div class="ph-sub">Temperatur &middot; Medikamente &middot; Verlauf</div>
+        </div>
+      </div>
+      <div class="ph-right">
+        <div class="ph-name">${c.name}</div>
+        <div class="ph-meta">${dobStr ? 'Geb.: '+dobStr+'&nbsp;&nbsp;' : ''}Export: ${exportStr}</div>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-item"><span class="ps-val">${entries.length}</span><span class="ps-lbl">Messungen</span></div>
+      <div class="ps-item"><span class="ps-val">${maxT} &deg;C</span><span class="ps-lbl">H&ouml;chstwert</span></div>
+      <div class="ps-item"><span class="ps-val">${avgT} &deg;C</span><span class="ps-lbl">Durchschnitt</span></div>
+      <div class="ps-item"><span class="ps-val" style="font-size:9pt">${zeitr}</span><span class="ps-lbl">Zeitraum</span></div>
+    </div>
+
+    <table class="pt">
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Datum</th>
+          <th>Uhrzeit</th>
+          <th class="num">Temp. &deg;C</th>
+          <th>Bewertung</th>
+          <th>Messort</th>
+          <th>Mittel</th>
+          <th>Menge</th>
+          <th>Wirkstoff</th>
+          <th>Notiz</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="pf">
+      <span>Vertrauliches Medizinisches Dokument &middot; Fieber Tracker</span>
+      <span>Dieses Protokoll ersetzt keine &auml;rztliche Diagnose oder Behandlung.</span>
+    </div>
+  `;
+}
+
+window.addEventListener('beforeprint', () => {
+  buildPrintPage();
+  document.getElementById('print-page').style.display = 'block';
+});
+window.addEventListener('afterprint', () => {
+  document.getElementById('print-page').style.display = 'none';
+});
+</script>
+</body>
+</html>
