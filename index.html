@@ -11,11 +11,9 @@
 <meta name="application-name" content="Fieber Tracker">
 <meta name="description" content="Professionelle Fieberdaten-Erfassung für Kinder">
 <title>Fieber Tracker</title>
-<script>
-// ── PWA SETUP ─────────────────────────────────────────────────────────────
-// Link manifest (already in <head> via <link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="icon-180.png" />
-<link rel="icon" type="image/png" href="icon-192.png" />
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -1231,6 +1229,13 @@ window.addEventListener('beforeprint', () => {
 window.addEventListener('afterprint', () => {
   document.getElementById('print-page').style.display = 'none';
 });
+</script>
+
+<script>
+if ('serviceWorker' in navigator &&
+    (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>
