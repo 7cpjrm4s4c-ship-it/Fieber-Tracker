@@ -752,9 +752,7 @@ function active() { return getC(activeId); }
 
 // ── INIT
 window.onload = () => {
-  const now = new Date();
-  document.getElementById('i-time').value = now.toTimeString().slice(0,5);
-  document.getElementById('i-date').value = now.toISOString().slice(0,10);
+  setCurrentDateTime();
   document.getElementById('m-name').addEventListener('keydown', e => { if(e.key==='Enter') confirmAdd(); });
   renderBar();
   if (children.length) selectChild(children[0].id);
@@ -786,6 +784,7 @@ function selectChild(id) {
   activeId = id;
   renderBar();
   renderVerlauf();
+  setCurrentDateTime();
 }
 
 function openAddChild() {
@@ -832,6 +831,16 @@ function switchView(name, btn) {
   document.getElementById('panel-'+name).classList.add('active');
   btn.classList.add('active');
   if (name==='verlauf') renderVerlauf();
+  if (name==='eingabe') setCurrentDateTime();
+}
+
+// ══════════════════════════════════
+//  DATE/TIME HELPER
+// ══════════════════════════════════
+function setCurrentDateTime() {
+  const now = new Date();
+  document.getElementById('i-time').value = now.toTimeString().slice(0,5);
+  document.getElementById('i-date').value = now.toISOString().slice(0,10);
 }
 
 // ══════════════════════════════════
@@ -896,9 +905,7 @@ function saveEntry() {
   document.getElementById('i-note').value='';
   document.getElementById('i-temp').value='';
   document.getElementById('tprev').innerHTML='';
-  const now=new Date();
-  document.getElementById('i-time').value=now.toTimeString().slice(0,5);
-  document.getElementById('i-date').value=now.toISOString().slice(0,10);
+  setCurrentDateTime();
 }
 
 // ══════════════════════════════════
