@@ -953,13 +953,44 @@ function escHtml(str) {
 // ══════════════════════════════════
 //  STATE
 // ══════════════════════════════════
-let children = JSON.parse(localStorage.getItem('ft3_ch') || '[]');
+const DB_VERSION = 1;
+const DB_KEY = 'ft3_db';
+
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) {
+      const db = JSON.parse(raw);
+      // Versioned format
+      if (db && db.version && Array.isArray(db.children)) return db.children;
+    }
+    // Migrate legacy flat array (ft3_ch)
+    const legacy = localStorage.getItem('ft3_ch');
+    if (legacy) {
+      const arr = JSON.parse(legacy);
+      if (Array.isArray(arr)) {
+        saveDB(arr);
+        localStorage.removeItem('ft3_ch');
+        return arr;
+      }
+    }
+  } catch(e) { console.warn('[FT] DB load error:', e); }
+  return [];
+}
+
+function saveDB(ch) {
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify({ version: DB_VERSION, children: ch }));
+  } catch(e) { console.warn('[FT] DB save error:', e); }
+}
+
+let children = loadDB();
 let activeId = null;
 
 const EMOJIS  = ['👦','👧','🧒','🐣','🌟','💛'];
 const AV_CLS  = ['av0','av1','av2','av3','av4','av5'];
 
-function save() { localStorage.setItem('ft3_ch', JSON.stringify(children)); }
+function save() { saveDB(children); }
 function getC(id) { return children.find(c=>c.id===id); }
 function active() { return getC(activeId); }
 
@@ -1198,7 +1229,6 @@ function delEntry(id) {
 // ══════════════════════════════════
 function renderChart(entries) {
   const container = document.getElementById('chart-container');
-  const card = document.getElementById('chart-card');
   if (!entries || entries.length < 2) {
     container.innerHTML = '<div class="chart-empty">Mindestens 2 Messungen für den Graphen</div>';
     return;
@@ -1273,8 +1303,8 @@ function renderChart(entries) {
     <svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="rgba(255,92,58,.25)"/>
-          <stop offset="100%" stop-color="rgba(255,92,58,.0)"/>
+          <stop offset="0%" stop-color="#ff5c3a" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#ff5c3a" stop-opacity="0"/>
         </linearGradient>
       </defs>
       ${yTicks.join('')}
