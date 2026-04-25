@@ -1,29 +1,33 @@
-const CACHE = 'fieber-tracker-v3';
+const CACHE = 'fieber-tracker-v4';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-152.png',
-  '/icon-167.png',
-  '/icon-180.png',
-  '/icon-192.png',
-  '/icon-512.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-152.png',
+  './icon-167.png',
+  './icon-180.png',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(cache =>
-      Promise.allSettled(ASSETS.map(u => cache.add(u).catch(() => {})))
+      // FIX Bug6: allSettled with individual error logging (not silently swallowed)
+      Promise.allSettled(
+        ASSETS.map(url => cache.add(url).catch(err => {
+          console.warn('[SW] Failed to cache:', url, err.message);
+        }))
+      )
     ).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', e => {
-  // Delete ALL old caches on activate
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => {
-        console.log('Deleting old cache:', k);
+        console.log('[SW] Removing old cache:', k);
         return caches.delete(k);
       }))
     ).then(() => self.clients.claim())
@@ -32,9 +36,9 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Network first for HTML, cache first for assets
   const isHTML = e.request.destination === 'document';
   if (isHTML) {
+    // Network-first for HTML: always get fresh version, fall back to cache
     e.respondWith(
       fetch(e.request)
         .then(resp => {
@@ -45,6 +49,7 @@ self.addEventListener('fetch', e => {
         .catch(() => caches.match(e.request))
     );
   } else {
+    // Cache-first for assets: fast, fall back to network
     e.respondWith(
       caches.match(e.request).then(cached => {
         if (cached) return cached;

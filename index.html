@@ -14,7 +14,6 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="icon" type="image/png" href="./icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -121,6 +120,7 @@ main { max-width:700px;margin:0 auto;padding:18px 14px 0 }
 .cbar::-webkit-scrollbar { height: 2px }
 .cbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px }
 
+.ctab-inner { display:flex; align-items:center; gap:7px; flex:1; cursor:pointer; }
 .ctab {
   flex-shrink: 0;
   display: flex; align-items: center; gap: 7px;
@@ -738,6 +738,19 @@ select { padding-right: 30px; cursor: pointer; color-scheme: dark }
 
 <script>
 // ══════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════
+function escHtml(str) {
+  // FIX Bug5: prevent HTML injection from user-entered names/notes
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// ══════════════════════════════════
 //  STATE
 // ══════════════════════════════════
 let children = JSON.parse(localStorage.getItem('ft3_ch') || '[]');
@@ -767,11 +780,24 @@ function renderBar() {
   children.forEach((c,i) => {
     const avCls = AV_CLS[i % AV_CLS.length];
     const em = EMOJIS[i % EMOJIS.length];
-    const btn = document.createElement('button');
-    btn.className = 'ctab' + (c.id===activeId?' active':'');
-    btn.innerHTML = `<span class="av ${avCls}">${em}</span>${c.name}<button class="cdel" onclick="event.stopPropagation();delChild('${c.id}')" title="Entfernen">✕</button>`;
-    btn.onclick = () => selectChild(c.id);
-    bar.appendChild(btn);
+    // FIX Bug1: div wrapper instead of button-in-button
+    const wrap = document.createElement('div');
+    wrap.className = 'ctab' + (c.id===activeId?' active':'');
+    wrap.setAttribute('role','button');
+    wrap.tabIndex = 0;
+    const inner = document.createElement('span');
+    inner.className = 'ctab-inner';
+    inner.innerHTML = `<span class="av ${avCls}">${em}</span>${escHtml(c.name)}`;
+    inner.addEventListener('click', () => selectChild(c.id));
+    inner.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' ') selectChild(c.id); });
+    const del = document.createElement('button');
+    del.className = 'cdel';
+    del.title = 'Entfernen';
+    del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); delChild(c.id); });
+    wrap.appendChild(inner);
+    wrap.appendChild(del);
+    bar.appendChild(wrap);
   });
   const add = document.createElement('button');
   add.className='btn-add-c'; add.textContent='➕ Kind hinzufügen'; add.onclick=openAddChild;
@@ -800,7 +826,7 @@ function confirmAdd() {
   const name = document.getElementById('m-name').value.trim();
   if (!name) { document.getElementById('m-name').focus(); return; }
   const dob  = document.getElementById('m-dob').value;
-  const c = {id: Date.now().toString(), name, dob, entries:[]};
+  const c = {id: (typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():Date.now().toString()+Math.random().toString(36).slice(2)), name, dob, entries:[]};
   children.push(c); save(); closeModal(); selectChild(c.id);
   showToast('👶 '+name+' hinzugefügt');
 }
@@ -837,10 +863,17 @@ function switchView(name, btn) {
 // ══════════════════════════════════
 //  DATE/TIME HELPER
 // ══════════════════════════════════
+function localDateStr(d) {
+  // FIX Bug3: toISOString() uses UTC → wrong date at night. Use local values instead.
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function setCurrentDateTime() {
   const now = new Date();
   document.getElementById('i-time').value = now.toTimeString().slice(0,5);
-  document.getElementById('i-date').value = now.toISOString().slice(0,10);
+  document.getElementById('i-date').value = localDateStr(now);
 }
 
 // ══════════════════════════════════
@@ -898,7 +931,7 @@ function saveEntry() {
   if (!time){showToast('❌ Uhrzeit eingeben');return;}
   if (!date){showToast('❌ Datum eingeben');return;}
   active().entries.unshift({
-    id:Date.now(), temp, time, date, site,
+    id:(typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():Date.now().toString()+Math.random().toString(36).slice(2)), temp, time, date, site,
     medType:med, dose:med!=='Keines'?dose:'—', active:med!=='Keines'?act:'—', note
   });
   save(); showToast('✅ Eintrag gespeichert');
@@ -932,7 +965,7 @@ function renderVerlauf() {
     const meds=e.medType!=='Keines'
       ?`<span class="ep med">💊 ${e.medType}</span><span class="ep dose">${e.dose}</span><span class="ep">${e.active}</span>`
       :`<span class="ep">Kein Fiebermittel</span>`;
-    const np=e.note?`<span class="ep" style="background:#eef2ff;color:#3b5bdb" title="${e.note}">📝 Notiz</span>`:'';
+    const np=e.note?`<span class="ep" style="background:#eef2ff;color:#3b5bdb" title="${escHtml(e.note)}">📝 Notiz</span>`:'';
     return `<div class="ei">
       <div class="ebar ${info.bar}"></div>
       <div class="ec">
@@ -956,10 +989,13 @@ function delEntry(id) {
 // ══════════════════════════════════
 //  TOAST
 // ══════════════════════════════════
+let _toastTimer = null;
 function showToast(msg) {
+  // FIX Bug4: clear previous timer to avoid race condition
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2600);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>t.classList.remove('show'),2600);
 }
 
 // ══════════════════════════════════
@@ -1165,9 +1201,6 @@ function buildPrintPage() {
     const info = getTI(e.temp);
     const colorCls = e.temp>=38.5?'re':e.temp>=37.5?'ye':'gr';
     const ds = new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-    const med = e.medType !== 'Keines'
-      ? `${e.medType} &middot; ${e.dose} &middot; ${e.active}`
-      : '<span style="color:#aaa">Keines</span>';
     return `<tr>
       <td class="num">${i+1}</td>
       <td>${ds}</td>
