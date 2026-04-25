@@ -583,6 +583,126 @@ select { padding-right: 30px; cursor: pointer; color-scheme: dark }
   .pt td.note { font-size:7.5pt;color:#5a5050; }
   .pf { margin-top:4mm;padding-top:2mm;border-top:.5pt solid #ccc;display:flex;justify-content:space-between;font-size:6.5pt;color:#999;page-break-inside:avoid; }
 }
+
+/* ── TEMPERATURGRAPH ── */
+.chart-wrap {
+  padding: 14px 14px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.chart-title {
+  font-size: 11px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase;
+  letter-spacing: .9px; margin-bottom: 10px;
+}
+.chart-svg { width: 100%; overflow: visible; display: block; }
+.chart-empty {
+  text-align: center; padding: 24px 0;
+  font-size: 12px; color: var(--muted);
+}
+
+/* ── WIRKZEIT BANNER ── */
+.med-banner {
+  margin-bottom: 12px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 12px;
+  position: relative; overflow: hidden;
+}
+.med-banner::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent,
+    rgba(255,255,255,.2), transparent);
+}
+.med-banner.active  { border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.08); }
+.med-banner.warning { border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.08); }
+.med-banner.expired { border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.08); }
+.med-banner-left { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.med-banner-label {
+  font-size: 11px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .8px;
+}
+.med-banner-info {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.med-banner-time { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.med-banner-countdown {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  flex-shrink: 0;
+}
+.countdown-val {
+  font-size: 22px; font-weight: 700; letter-spacing: -.5px; line-height: 1;
+}
+.countdown-lbl {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .7px;
+}
+.countdown-bar-wrap {
+  width: 100%; height: 3px;
+  background: rgba(255,255,255,.1);
+  border-radius: 2px; margin-top: 8px; overflow: hidden;
+}
+.countdown-bar { height: 100%; border-radius: 2px; transition: width 1s linear; }
+.med-banner.active  .countdown-bar { background: var(--green); }
+.med-banner.warning .countdown-bar { background: var(--yellow); }
+.med-banner.expired .countdown-bar { background: var(--red); }
+.med-banner.active  .countdown-val { color: var(--green); }
+.med-banner.warning .countdown-val { color: var(--yellow); }
+.med-banner.expired .countdown-val { color: var(--red); }
+
+/* ── EDIT MODAL ── */
+#modal-edit { z-index: 300; }
+.modal-edit-inner {
+  max-height: 90vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-section-title {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .9px;
+  margin: 14px 0 8px;
+}
+.modal-section-title:first-child { margin-top: 0; }
+.edit-fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.edit-fg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.edit-fg  { display: flex; flex-direction: column; gap: 5px; }
+.edit-fg label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+.edit-fg input, .edit-fg select, .edit-fg textarea {
+  font-family: inherit; font-size: 16px; color: var(--text);
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-xs); padding: 9px 11px; outline: none;
+  transition: border-color .18s; -webkit-appearance: none; appearance: none;
+  width: 100%; color-scheme: dark;
+}
+.edit-fg input:focus, .edit-fg select:focus, .edit-fg textarea:focus {
+  border-color: var(--input-focus-border);
+  background: rgba(255,255,255,.11);
+}
+.edit-sw { position: relative; }
+.edit-sw::after { content:'▾'; position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; font-size:12px; }
+.edit-sw select { padding-right: 28px; cursor: pointer; }
+.edit-tw { position: relative; }
+.edit-tw input { font-size: 18px; font-weight: 500; padding-right: 38px; }
+.edit-tu { position:absolute; right:11px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:13px; font-weight:500; }
+.btn-update {
+  width: 100%; padding: 13px;
+  background: linear-gradient(145deg, rgba(255,100,60,.9), rgba(220,50,20,.95));
+  color: #fff; border: none; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; margin-top: 10px; transition: all .18s;
+  box-shadow: 0 4px 20px rgba(255,92,58,.35), 0 1px 0 rgba(255,255,255,.15) inset;
+}
+.btn-update:hover { background: linear-gradient(145deg,rgba(255,120,80,.95),rgba(240,60,25,1)); }
+
+/* ── ENTRY — edit tap area ── */
+.ei { cursor: pointer; }
+.ei:active { background: rgba(255,255,255,.09); }
+.edel { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -697,11 +817,24 @@ select { padding-right: 30px; cursor: pointer; color-scheme: dark }
 
     <!-- VERLAUF -->
     <div class="panel" id="panel-verlauf">
+
+      <!-- Wirkzeit Banner -->
+      <div id="med-banner" style="display:none"></div>
+
       <div class="stats">
         <div class="stat"><b id="s-count">0</b><small>Messungen</small></div>
         <div class="stat"><b id="s-max">—</b><small>Höchst °C</small></div>
         <div class="stat"><b id="s-avg">—</b><small>Ø Temp °C</small></div>
       </div>
+
+      <!-- Temperaturgraph -->
+      <div class="card" id="chart-card">
+        <div class="chart-wrap">
+          <div class="chart-title">Temperaturverlauf</div>
+          <div id="chart-container"></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="list-tb">
           <span id="lcount">0 Einträge</span>
@@ -717,6 +850,73 @@ select { padding-right: 30px; cursor: pointer; color-scheme: dark }
   </div><!-- /childContent -->
 
 </main>
+
+<!-- EDIT ENTRY MODAL -->
+<div class="mbg" id="modal-edit">
+  <div class="modal" style="max-width:400px">
+    <h3>Eintrag bearbeiten</h3>
+    <div class="modal-edit-inner">
+      <div class="modal-section-title">Messung</div>
+      <div class="edit-fg2" style="margin-bottom:10px">
+        <div class="edit-fg">
+          <label>Temperatur</label>
+          <div class="edit-tw">
+            <input type="number" id="e-temp" min="34" max="42.5" step="0.1" placeholder="36,0">
+            <span class="edit-tu">°C</span>
+          </div>
+        </div>
+        <div class="edit-fg">
+          <label>Uhrzeit</label>
+          <input type="time" id="e-time">
+        </div>
+      </div>
+      <div class="edit-fg2" style="margin-bottom:4px">
+        <div class="edit-fg">
+          <label>Datum</label>
+          <input type="date" id="e-date">
+        </div>
+        <div class="edit-fg">
+          <label>Messort</label>
+          <div class="edit-sw"><select id="e-site">
+            <option>Rektal</option>
+            <option>Axillar (Achsel)</option>
+            <option>Oral</option>
+            <option>Ohr</option>
+            <option>Stirn</option>
+          </select></div>
+        </div>
+      </div>
+      <div class="modal-section-title">Fiebermittel</div>
+      <div class="edit-fg3" style="margin-bottom:4px">
+        <div class="edit-fg">
+          <label>Mittel</label>
+          <div class="edit-sw"><select id="e-med" onchange="onEditMedChange()">
+            <option value="Keines">Keines</option>
+            <option value="Zäpfchen">Zäpfchen</option>
+            <option value="Saft">Saft</option>
+          </select></div>
+        </div>
+        <div class="edit-fg">
+          <label>Menge</label>
+          <div class="edit-sw"><select id="e-dose" disabled><option value="—">—</option></select></div>
+        </div>
+        <div class="edit-fg">
+          <label>Wirkstoff</label>
+          <div class="edit-sw"><select id="e-active" disabled><option value="—">—</option></select></div>
+        </div>
+      </div>
+      <div class="modal-section-title">Notiz</div>
+      <div class="edit-fg" style="margin-bottom:4px">
+        <textarea id="e-note" rows="2" placeholder="Symptome, Befinden…"
+          style="width:100%;font-family:inherit;font-size:16px;color:var(--text);background:var(--input-bg);border:1px solid var(--input-border);border-radius:var(--radius-xs);padding:9px 11px;outline:none;resize:none;color-scheme:dark"></textarea>
+      </div>
+      <button class="btn-update" onclick="saveEdit()">✓ Änderungen speichern</button>
+    </div>
+    <div class="mbtns" style="margin-top:10px">
+      <button class="mbtn no" onclick="closeEditModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
 
 <!-- ADD CHILD MODAL -->
 <div class="mbg" id="modal-add">
@@ -949,6 +1149,11 @@ function renderVerlauf() {
   const entries = c.entries, n = entries.length;
   document.getElementById('lcount').textContent = n+(n===1?' Eintrag':' Einträge');
   document.getElementById('s-count').textContent = n;
+
+  // Always render chart + banner (even if empty)
+  renderChart(entries);
+  renderMedBanner(entries);
+
   if (n===0) {
     document.getElementById('s-max').textContent='—';
     document.getElementById('s-avg').textContent='—';
@@ -963,10 +1168,11 @@ function renderVerlauf() {
     const info=getTI(e.temp);
     const ds=new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
     const meds=e.medType!=='Keines'
-      ?`<span class="ep med">💊 ${e.medType}</span><span class="ep dose">${e.dose}</span><span class="ep">${e.active}</span>`
+      ?`<span class="ep med">💊 ${escHtml(e.medType)}</span><span class="ep dose">${escHtml(e.dose)}</span><span class="ep">${escHtml(e.active)}</span>`
       :`<span class="ep">Kein Fiebermittel</span>`;
     const np=e.note?`<span class="ep" style="background:#eef2ff;color:#3b5bdb" title="${escHtml(e.note)}">📝 Notiz</span>`:'';
-    return `<div class="ei">
+    // Serialise id safely — use data attribute to avoid injection
+    return `<div class="ei" data-id="${escHtml(String(e.id))}" onclick="openEditModal(this.dataset.id)">
       <div class="ebar ${info.bar}"></div>
       <div class="ec">
         <div class="etop">
@@ -974,16 +1180,262 @@ function renderVerlauf() {
           <div><div class="etime">${ds} · ${e.time} Uhr</div>
           <span class="tbadge ${info.cls}" style="margin-top:3px;display:inline-flex">${info.icon} ${info.label}</span></div>
         </div>
-        <div class="ebot"><span class="ep">📍 ${e.site}</span>${meds}${np}</div>
+        <div class="ebot"><span class="ep">📍 ${escHtml(e.site)}</span>${meds}${np}</div>
       </div>
-      <button class="edel" onclick="delEntry(${e.id})">✕</button>
+      <button class="edel" onclick="event.stopPropagation();delEntry(this.closest('.ei').dataset.id)">✕</button>
     </div>`;
   }).join('')+'</div>';
 }
 
 function delEntry(id) {
-  const c=active(); c.entries=c.entries.filter(e=>e.id!==id);
+  // id may come as string from data-attribute
+  const c=active(); c.entries=c.entries.filter(e=>String(e.id)!==String(id));
   save(); renderVerlauf(); showToast('🗑 Eintrag gelöscht');
+}
+
+// ══════════════════════════════════
+//  TEMPERATURGRAPH (inline SVG)
+// ══════════════════════════════════
+function renderChart(entries) {
+  const container = document.getElementById('chart-container');
+  const card = document.getElementById('chart-card');
+  if (!entries || entries.length < 2) {
+    container.innerHTML = '<div class="chart-empty">Mindestens 2 Messungen für den Graphen</div>';
+    return;
+  }
+
+  const sorted = [...entries].sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time));
+  const W = 340, H = 140, PL = 38, PR = 12, PT = 14, PB = 28;
+  const GW = W - PL - PR, GH = H - PT - PB;
+
+  const temps  = sorted.map(e => e.temp);
+  const minT   = Math.max(35, Math.floor(Math.min(...temps)) - 0.5);
+  const maxT   = Math.min(42.5, Math.ceil(Math.max(...temps)) + 0.5);
+  const tRange = maxT - minT || 1;
+
+  const xOf = i => PL + (i / (sorted.length - 1)) * GW;
+  const yOf = t => PT + GH - ((t - minT) / tRange) * GH;
+
+  // Build path
+  const pts = sorted.map((e,i) => `${xOf(i).toFixed(1)},${yOf(e.temp).toFixed(1)}`);
+  const linePath = 'M' + pts.join('L');
+
+  // Area fill
+  const areaPath = `M${xOf(0).toFixed(1)},${(PT+GH).toFixed(1)}L${pts.join('L')}L${xOf(sorted.length-1).toFixed(1)},${(PT+GH).toFixed(1)}Z`;
+
+  // Y-axis ticks
+  const yTicks = [];
+  const tickVals = [36, 37, 37.5, 38, 38.5, 39, 40, 41];
+  tickVals.forEach(v => {
+    if (v >= minT && v <= maxT) {
+      const y = yOf(v).toFixed(1);
+      const isRef = v === 38.5;
+      yTicks.push(`
+        <line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}"
+          stroke="${isRef ? 'rgba(248,113,113,.5)' : 'rgba(255,255,255,.07)'}"
+          stroke-width="${isRef ? 1.5 : 1}"
+          stroke-dasharray="${isRef ? '4,3' : ''}"/>
+        <text x="${(PL-4).toFixed(1)}" y="${y}" dy="4"
+          text-anchor="end" fill="rgba(255,255,255,.4)" font-size="9">${v}</text>
+      `);
+    }
+  });
+
+  // X-axis labels (max 6 evenly spaced)
+  const xLabels = [];
+  const step = Math.max(1, Math.ceil(sorted.length / 6));
+  sorted.forEach((e, i) => {
+    if (i % step === 0 || i === sorted.length - 1) {
+      const x = xOf(i).toFixed(1);
+      const d = new Date(e.date + 'T12:00');
+      const lbl = `${d.getDate()}.${d.getMonth()+1}.`;
+      xLabels.push(`<text x="${x}" y="${H-4}" text-anchor="middle"
+        fill="rgba(255,255,255,.35)" font-size="9">${lbl}</text>`);
+    }
+  });
+
+  // Data points
+  const circles = sorted.map((e, i) => {
+    const cx = xOf(i).toFixed(1), cy = yOf(e.temp).toFixed(1);
+    const col = e.temp >= 38.5 ? '#f87171' : e.temp >= 37.5 ? '#fbbf24' : '#34d399';
+    return `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"
+      stroke="rgba(0,0,0,.6)" stroke-width="1.5"/>`;
+  });
+
+  // 38.5°C label
+  const refY = yOf(38.5).toFixed(1);
+  const refLabel = (38.5 >= minT && 38.5 <= maxT)
+    ? `<text x="${(W-PR+2).toFixed(1)}" y="${refY}" dy="4"
+        fill="rgba(248,113,113,.7)" font-size="8.5" font-weight="600">38.5</text>`
+    : '';
+
+  container.innerHTML = `
+    <svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(255,92,58,.25)"/>
+          <stop offset="100%" stop-color="rgba(255,92,58,.0)"/>
+        </linearGradient>
+      </defs>
+      ${yTicks.join('')}
+      <path d="${areaPath}" fill="url(#areaGrad)"/>
+      <path d="${linePath}" fill="none" stroke="rgba(255,92,58,.8)" stroke-width="2"
+        stroke-linejoin="round" stroke-linecap="round"/>
+      ${circles.join('')}
+      ${xLabels.join('')}
+      ${refLabel}
+    </svg>`;
+}
+
+// ══════════════════════════════════
+//  WIRKZEIT BANNER
+// ══════════════════════════════════
+const MED_WIRKDAUER_H = 8;
+let _wirkTimer = null;
+
+function renderMedBanner(entries) {
+  const banner = document.getElementById('med-banner');
+  clearInterval(_wirkTimer);
+
+  // Find most recent entry with a medication
+  const withMed = [...entries]
+    .filter(e => e.medType !== 'Keines')
+    .sort((a,b) => new Date(b.date+'T'+b.time) - new Date(a.date+'T'+a.time));
+
+  if (!withMed.length) { banner.style.display = 'none'; return; }
+
+  const last = withMed[0];
+  const givenAt  = new Date(last.date + 'T' + last.time);
+  const expiresAt = new Date(givenAt.getTime() + MED_WIRKDAUER_H * 3600000);
+
+  function update() {
+    const now = new Date();
+    const msLeft = expiresAt - now;
+    const pct    = Math.max(0, Math.min(100, (msLeft / (MED_WIRKDAUER_H * 3600000)) * 100));
+
+    let cls, countdown;
+    if (msLeft <= 0) {
+      cls = 'expired';
+      countdown = 'Abgelaufen';
+    } else {
+      const hLeft = Math.floor(msLeft / 3600000);
+      const mLeft = Math.floor((msLeft % 3600000) / 60000);
+      countdown = `${hLeft}h ${String(mLeft).padStart(2,'0')}m`;
+      cls = msLeft < 2 * 3600000 ? 'warning' : 'active';
+    }
+
+    const givenStr = givenAt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+    const expStr   = expiresAt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+    const statusLbl = cls === 'expired' ? 'Wirkzeit abgelaufen' :
+                      cls === 'warning' ? 'Bald abgelaufen' : 'Wirksam bis';
+
+    banner.className = `med-banner ${cls}`;
+    banner.style.display = 'flex';
+    banner.innerHTML = `
+      <div class="med-banner-left">
+        <div class="med-banner-label">Letztes Mittel</div>
+        <div class="med-banner-info">
+          💊 ${escHtml(last.medType)} ${escHtml(last.dose)} ${escHtml(last.active)}
+        </div>
+        <div class="med-banner-time">Gegeben: ${givenStr} · ${statusLbl}: ${expStr}</div>
+        <div class="countdown-bar-wrap">
+          <div class="countdown-bar" style="width:${pct.toFixed(1)}%"></div>
+        </div>
+      </div>
+      <div class="med-banner-countdown">
+        <div class="countdown-val">${msLeft > 0 ? countdown.split('h')[0]+'h' : '—'}</div>
+        <div class="countdown-lbl">${msLeft > 0 ? countdown.split(' ')[1] || '' : 'abgelaufen'}</div>
+      </div>`;
+
+    if (msLeft <= 0) clearInterval(_wirkTimer);
+  }
+
+  update();
+  _wirkTimer = setInterval(update, 30000); // update every 30s
+}
+
+// ══════════════════════════════════
+//  EDIT ENTRY
+// ══════════════════════════════════
+let _editId = null;
+
+function openEditModal(entryId) {
+  const c = active();
+  const e = c.entries.find(x => String(x.id) === String(entryId));
+  if (!e) return;
+  _editId = entryId;
+
+  // Populate fields
+  document.getElementById('e-temp').value = e.temp;
+  document.getElementById('e-time').value = e.time;
+  document.getElementById('e-date').value = e.date;
+  document.getElementById('e-site').value = e.site;
+  document.getElementById('e-note').value = e.note || '';
+
+  // Med fields
+  const medSel = document.getElementById('e-med');
+  medSel.value = e.medType;
+  onEditMedChange();
+  if (e.medType !== 'Keines') {
+    document.getElementById('e-dose').value   = e.dose;
+    document.getElementById('e-active').value = e.active;
+  }
+
+  document.getElementById('modal-edit').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('modal-edit').classList.remove('open');
+  _editId = null;
+}
+
+function onEditMedChange() {
+  const t = document.getElementById('e-med').value;
+  const d = document.getElementById('e-dose');
+  const a = document.getElementById('e-active');
+  d.innerHTML = a.innerHTML = '';
+  if (t === 'Keines') {
+    d.disabled = a.disabled = true;
+    d.innerHTML = a.innerHTML = '<option value="—">—</option>';
+  } else {
+    d.disabled = a.disabled = false;
+    (t === 'Zäpfchen' ? ['75 mg','125 mg','250 mg'] : ['2,5 ml','3,75 ml','5 ml','7,5 ml'])
+      .forEach(x => d.innerHTML += `<option>${x}</option>`);
+    ['Paracetamol','Ibuprofen'].forEach(x => a.innerHTML += `<option>${x}</option>`);
+  }
+}
+
+function saveEdit() {
+  const c = active();
+  const e = c.entries.find(x => x.id === _editId);
+  if (!e) return;
+
+  const temp = parseFloat(document.getElementById('e-temp').value);
+  const time = document.getElementById('e-time').value;
+  const date = document.getElementById('e-date').value;
+  const site = document.getElementById('e-site').value;
+  const med  = document.getElementById('e-med').value;
+  const dose = document.getElementById('e-dose').value;
+  const act  = document.getElementById('e-active').value;
+  const note = document.getElementById('e-note').value.trim();
+
+  if (!temp || temp < 34 || temp > 42.5) { showToast('❌ Gültige Temperatur eingeben'); return; }
+  if (!time) { showToast('❌ Uhrzeit eingeben'); return; }
+  if (!date) { showToast('❌ Datum eingeben'); return; }
+
+  e.temp    = temp;
+  e.time    = time;
+  e.date    = date;
+  e.site    = site;
+  e.medType = med;
+  e.dose    = med !== 'Keines' ? dose : '—';
+  e.active  = med !== 'Keines' ? act  : '—';
+  e.note    = note;
+
+  save();
+  closeEditModal();
+  renderVerlauf();
+  showToast('✏️ Eintrag aktualisiert');
 }
 
 // ══════════════════════════════════
