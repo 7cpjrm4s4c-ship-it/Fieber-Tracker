@@ -1584,7 +1584,7 @@ function exportPDF() {
 
   // Column widths — must sum to CW = 273
   // #(7) Datum(22) Uhrzeit(19) Temp(16) Bewertung(28) Messort(26) Mittel(20) Menge(18) Wirkstoff(24) Notiz(rest=93)
-  const CWS = [7,22,19,16,28,26,20,18,24,93];
+  const CWS = [12,22,19,16,28,26,20,18,24,88]; // col 0: 7→12, Notiz angepasst (Summe bleibt 273)
 
   doc.autoTable({
     startY,
