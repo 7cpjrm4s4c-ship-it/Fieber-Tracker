@@ -1141,7 +1141,7 @@ function onMedChange() {
     n.textContent='';
   } else {
     d.disabled=a.disabled=false;
-    (t==='Zäpfchen'?['75 mg','125 mg','250 mg']:['2,5 ml','3,75 ml','5 ml','7,5 ml'])
+    (t==='Zäpfchen'?['60 mg', '75 mg','125 mg','250 mg']:['2,5 ml','3,75 ml','5 ml','7,5 ml'])
       .forEach(x=>d.innerHTML+=`<option>${x}</option>`);
     ['Paracetamol','Ibuprofen'].forEach(x=>a.innerHTML+=`<option>${x}</option>`);
     n.textContent = t==='Zäpfchen'?'💡 Für Kleinkinder ab 6 kg':'💡 Dosierung nach Körpergewicht';
@@ -1432,7 +1432,7 @@ function onEditMedChange() {
     d.innerHTML = a.innerHTML = '<option value="—">—</option>';
   } else {
     d.disabled = a.disabled = false;
-    (t === 'Zäpfchen' ? ['75 mg','125 mg','250 mg'] : ['2,5 ml','3,75 ml','5 ml','7,5 ml'])
+    (t === 'Zäpfchen' ? ['60 mg', '75 mg','125 mg','250 mg'] : ['2,5 ml','3,75 ml','5 ml','7,5 ml'])
       .forEach(x => d.innerHTML += `<option>${x}</option>`);
     ['Paracetamol','Ibuprofen'].forEach(x => a.innerHTML += `<option>${x}</option>`);
   }
