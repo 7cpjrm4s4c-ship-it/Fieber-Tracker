@@ -1,0 +1,994 @@
+// ══════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════
+function escHtml(str) {
+  // FIX Bug5: prevent HTML injection from user-entered names/notes
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// ══════════════════════════════════
+//  FESTE KINDER (direkt im Code)
+// ══════════════════════════════════
+const FIXED_CHILDREN = [
+  { id: 'child-leni', name: 'Leni', emoji: '👧', avCls: 'av0' },
+  { id: 'child-rosa', name: 'Rosa', emoji: '👶', avCls: 'av1' },
+  { id: 'child-ben',  name: 'Ben',  emoji: '👦', avCls: 'av2' },
+];
+
+// ══════════════════════════════════
+//  STATE & PERSISTENZ
+// ══════════════════════════════════
+const DB_VERSION = 2;
+const DB_KEY = 'ft_entries_v2';  // entries pro Kind-ID
+
+function loadEntries(childId) {
+  try {
+    const raw = localStorage.getItem(DB_KEY + '_' + childId);
+    if (raw) return JSON.parse(raw);
+  } catch(e) { console.warn('[FT] load error:', e); }
+  return [];
+}
+
+function saveEntries(childId, entries) {
+  try {
+    localStorage.setItem(DB_KEY + '_' + childId, JSON.stringify(entries));
+  } catch(e) { console.warn('[FT] save error:', e); }
+}
+
+// Aufgebautes children-Array mit Entries aus LocalStorage
+let children = FIXED_CHILDREN.map(fc => ({
+  ...fc,
+  dob: '',
+  entries: loadEntries(fc.id)
+}));
+
+let activeId = children[0].id;
+
+function getWirkDefault(){
+  try{const v=parseInt(localStorage.getItem('ft_wirkdauer'),10);if(v>=6&&v<=8)return v;}catch(e){}
+  return 8;
+}
+function saveWirkDefault(){
+  try{localStorage.setItem('ft_wirkdauer',String(document.getElementById('i-wirk').value));}catch(e){}
+}
+function getRangeHours(){
+  const sel=document.getElementById('i-range');
+  if(!sel||sel.value==='all')return null;
+  return parseInt(sel.value,10);
+}
+function filterByRange(entries,h){
+  if(!h)return entries;
+  const cutoff=Date.now()-h*3600000;
+  return entries.filter(e=>new Date(e.date+'T'+e.time).getTime()>=cutoff);
+}
+
+function save() {
+  const c = active();
+  if (c) saveEntries(c.id, c.entries);
+}
+function getC(id) { return children.find(c=>c.id===id); }
+function active() { return getC(activeId); }
+
+// ── INIT
+window.onload = () => {
+  setCurrentDateTime();
+  renderDropdown();
+  selectChild(children[0].id);
+};
+
+// ══════════════════════════════════
+//  DROPDOWN KINDER
+// ══════════════════════════════════
+function renderDropdown() {
+  const dropdown = document.getElementById('childDropdown');
+  const trigger  = document.getElementById('childTrigger');
+  dropdown.innerHTML = '';
+
+  children.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'child-item' + (c.id === activeId ? ' selected' : '');
+    const entryCount = c.entries.length;
+    const lastEntry = c.entries.length
+      ? [...c.entries].sort((a,b)=>new Date(b.date+'T'+b.time)-new Date(a.date+'T'+a.time))[0]
+      : null;
+    const subText = entryCount === 0
+      ? 'Keine Messungen'
+      : `${entryCount} Messung${entryCount!==1?'en':''} · Zuletzt ${lastEntry.temp!=null?lastEntry.temp.toFixed(1)+'°C':'—'}`;
+
+    item.innerHTML = `
+      <div class="child-item-av ${c.avCls}">${c.emoji}</div>
+      <div class="child-item-info">
+        <div class="child-item-name">${escHtml(c.name)}</div>
+        <div class="child-item-sub">${subText}</div>
+      </div>
+      <span class="child-item-check">✓</span>`;
+    item.addEventListener('click', () => {
+      selectChild(c.id);
+      closeChildDropdown();
+    });
+    dropdown.appendChild(item);
+  });
+
+  // Trigger-Button aktualisieren
+  const ac = getC(activeId);
+  if (ac) {
+    trigger.classList.remove('empty');
+    document.getElementById('triggerAvatar').textContent = ac.emoji;
+    document.getElementById('triggerAvatar').className = 'child-trigger-avatar ' + ac.avCls;
+    document.getElementById('triggerName').textContent = ac.name;
+    const ec = ac.entries.length;
+    document.getElementById('triggerMeta').textContent =
+      ec === 0 ? 'Keine Messungen' : `${ec} Messung${ec!==1?'en':''}`;
+  }
+}
+
+function toggleChildDropdown() {
+  const sel = document.getElementById('childSelector');
+  const isOpen = sel.classList.contains('open');
+  if (isOpen) closeChildDropdown();
+  else openChildDropdown();
+}
+
+function openChildDropdown() {
+  const sel = document.getElementById('childSelector');
+  renderDropdown();
+  sel.classList.add('open');
+  // Close on outside tap
+  setTimeout(() => {
+    document.addEventListener('click', outsideCloseHandler, { once: true });
+  }, 10);
+}
+
+function closeChildDropdown() {
+  document.getElementById('childSelector').classList.remove('open');
+  document.removeEventListener('click', outsideCloseHandler);
+}
+
+function outsideCloseHandler(e) {
+  const sel = document.getElementById('childSelector');
+  if (!sel.contains(e.target)) closeChildDropdown();
+}
+
+function selectChild(id) {
+  activeId = id;
+  renderDropdown();
+  renderVerlauf();
+  setCurrentDateTime();
+  document.getElementById('childContent').style.display = 'block';
+}
+
+function clearChild() {
+  const c = active();
+  if (!c||c.entries.length===0){showToast('Keine Einträge vorhanden');return;}
+  if (!confirm('Alle Einträge von '+c.name+' löschen?')) return;
+  c.entries=[]; save(); renderDropdown(); renderVerlauf();
+  showToast('🗑 Einträge von '+c.name+' gelöscht');
+}
+
+// ══════════════════════════════════
+//  VIEW TABS
+// ══════════════════════════════════
+function switchView(name, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='verlauf') renderVerlauf();
+  if (name==='eingabe') setCurrentDateTime();
+}
+
+// ══════════════════════════════════
+//  DATE/TIME HELPER
+// ══════════════════════════════════
+function localDateStr(d) {
+  // FIX Bug3: toISOString() uses UTC → wrong date at night. Use local values instead.
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function setCurrentDateTime() {
+  const now = new Date();
+  document.getElementById('i-time').value = now.toTimeString().slice(0,5);
+  document.getElementById('i-date').value = localDateStr(now);
+}
+
+// ══════════════════════════════════
+//  TEMP
+// ══════════════════════════════════
+function getTI(t) {
+  if (t<37.5) return {cls:'tn',bar:'bg',label:'Kein Fieber',icon:'✅'};
+  if (t<38.5) return {cls:'te',bar:'by',label:'Erhöhte Temp.',icon:'⚠️'};
+  return {cls:'tf',bar:'br',label:'Fieber',icon:'🔴'};
+}
+function onTempInput() {
+  const v = parseFloat(document.getElementById('i-temp').value);
+  const el = document.getElementById('tprev');
+  if (!v||v<34||v>42.5){el.innerHTML='';return;}
+  const i=getTI(v);
+  el.innerHTML=`<span class="tbadge ${i.cls}">${i.icon} ${i.label}</span>`;
+}
+
+// ══════════════════════════════════
+//  MED OPTIONS
+// ══════════════════════════════════
+function onMedChange() {
+  const t = document.getElementById('i-med').value;
+  const d = document.getElementById('i-dose');
+  const a = document.getElementById('i-active');
+  const n = document.getElementById('med-note');
+  d.innerHTML=a.innerHTML='';
+  const wrow = document.getElementById('i-wirk-row');
+  if (t==='Keines') {
+    d.disabled=a.disabled=true;
+    d.innerHTML=a.innerHTML='<option value="—">—</option>';
+    n.textContent='';
+    wrow.style.display='none';
+  } else {
+    d.disabled=a.disabled=false;
+    (t==='Zäpfchen'?['60 mg', '75 mg','125 mg','250 mg']:['2,5 ml','3,75 ml','5 ml','7,5 ml'])
+      .forEach(x=>d.innerHTML+=`<option>${x}</option>`);
+    ['Paracetamol','Ibuprofen'].forEach(x=>a.innerHTML+=`<option>${x}</option>`);
+    n.textContent = t==='Zäpfchen'?'💡 Für Kleinkinder ab 6 kg':'💡 Dosierung nach Körpergewicht';
+    if (t==='Zäpfchen') {
+      wrow.style.display='';
+      document.getElementById('i-wirk').value=String(getWirkDefault());
+    } else {
+      wrow.style.display='none';
+    }
+  }
+}
+
+// ══════════════════════════════════
+//  SAVE ENTRY
+// ══════════════════════════════════
+function saveEntry() {
+  if (!activeId){showToast('Bitte zuerst ein Kind auswählen');return;}
+  const tempRaw = document.getElementById('i-temp').value;
+  const temp = tempRaw!=='' ? parseFloat(tempRaw) : null;
+  const time = document.getElementById('i-time').value;
+  const date = document.getElementById('i-date').value;
+  const site = document.getElementById('i-site').value;
+  const med  = document.getElementById('i-med').value;
+  const dose = document.getElementById('i-dose').value;
+  const act  = document.getElementById('i-active').value;
+  const note = document.getElementById('i-note').value.trim();
+  if (temp!==null&&(temp<34||temp>42.5)){showToast('❌ Gültige Temperatur eingeben (34–42,5°C)');return;}
+  if (temp===null&&med==='Keines'){showToast('❌ Bitte Temperatur oder Fiebermittel angeben');return;}
+  if (!time){showToast('❌ Uhrzeit eingeben');return;}
+  if (!date){showToast('❌ Datum eingeben');return;}
+  const wirkh = med==='Zäpfchen' ? (parseInt(document.getElementById('i-wirk').value,10)||getWirkDefault()) : null;
+  active().entries.unshift({
+    id:(typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():Date.now().toString()+Math.random().toString(36).slice(2)), temp, time, date, site,
+    medType:med, dose:med!=='Keines'?dose:'—', active:med!=='Keines'?act:'—', note, wirkh
+  });
+  save(); showToast('✅ Eintrag gespeichert');
+  document.getElementById('i-note').value='';
+  document.getElementById('i-temp').value='';
+  document.getElementById('tprev').innerHTML='';
+  setCurrentDateTime();
+}
+
+// ══════════════════════════════════
+//  RENDER VERLAUF
+// ══════════════════════════════════
+function renderVerlauf() {
+  const c = active(); if (!c) return;
+  const rangeH = getRangeHours();
+  const entries = filterByRange(c.entries, rangeH), n = entries.length;
+  document.getElementById('lcount').textContent = n+(n===1?' Eintrag':' Einträge');
+  document.getElementById('s-count').textContent = n;
+
+  // Chart + Statistik + Liste folgen dem Zeitraum-Filter,
+  // der Wirkzeit-Banner zeigt immer das letzte Mittel (ungefiltert)
+  renderChart(entries);
+  renderMedBanner(c.entries);
+
+  if (n===0) {
+    document.getElementById('s-max').textContent='—';
+    document.getElementById('s-avg').textContent='—';
+    document.getElementById('elist').innerHTML=`<div class="empty"><span>🌡️</span><h3>Keine Einträge</h3><p>${rangeH?'Keine Einträge im gewählten Zeitraum.':'Erfasse die erste Temperaturmessung im Tab „Erfassung".'}</p></div>`;
+    return;
+  }
+  const temps=entries.filter(e=>e.temp!==null&&e.temp!==undefined).map(e=>e.temp);
+  document.getElementById('s-max').textContent=temps.length?Math.max(...temps).toFixed(1):'—';
+  document.getElementById('s-avg').textContent=temps.length?(temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1):'—';
+  const sorted=[...entries].sort((a,b)=>new Date(b.date+'T'+b.time)-new Date(a.date+'T'+a.time));
+  document.getElementById('elist').innerHTML='<div class="elist">'+sorted.map(e=>{
+    const hasTemp = e.temp!==null&&e.temp!==undefined;
+    const info=hasTemp?getTI(e.temp):{cls:'tn',bar:'bg',label:'Ohne Messung',icon:'💊'};
+    const ds=new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const meds=e.medType!=='Keines'
+      ?`<span class="ep med">💊 ${escHtml(e.medType)}</span><span class="ep dose">${escHtml(e.dose)}</span><span class="ep">${escHtml(e.active)}</span>`
+      :`<span class="ep">Kein Fiebermittel</span>`;
+    const np=e.note?`<span class="ep" style="background:#eef2ff;color:#3b5bdb" title="${escHtml(e.note)}">📝 Notiz</span>`:'';
+    // Serialise id safely — use data attribute to avoid injection
+    return `<div class="ei" data-id="${escHtml(String(e.id))}" onclick="openEditModal(this.dataset.id)">
+      <div class="ebar ${info.bar}"></div>
+      <div class="ec">
+        <div class="etop">
+          <span class="etemp">${hasTemp?e.temp.toFixed(1)+'°C':'—'}</span>
+          <div><div class="etime">${ds} · ${e.time} Uhr</div>
+          <span class="tbadge ${info.cls}" style="margin-top:3px;display:inline-flex">${info.icon} ${info.label}</span></div>
+        </div>
+        <div class="ebot"><span class="ep">📍 ${escHtml(e.site)}</span>${meds}${np}</div>
+      </div>
+      <button class="edel" onclick="event.stopPropagation();delEntry(this.closest('.ei').dataset.id)">✕</button>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function delEntry(id) {
+  // id may come as string from data-attribute
+  const c=active(); c.entries=c.entries.filter(e=>String(e.id)!==String(id));
+  save(); renderVerlauf(); showToast('🗑 Eintrag gelöscht');
+}
+
+// ══════════════════════════════════
+//  TEMPERATURGRAPH (inline SVG)
+// ══════════════════════════════════
+function renderChart(entriesIn) {
+  const container = document.getElementById('chart-container');
+  const entries = (entriesIn||[]).filter(e=>e.temp!==null&&e.temp!==undefined);
+  if (entries.length < 2) {
+    container.innerHTML = '<div class="chart-empty">Mindestens 2 Messungen für den Graphen</div>';
+    return;
+  }
+
+  const sorted = [...entries].sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time));
+  const W = 340, H = 140, PL = 38, PR = 12, PT = 14, PB = 28;
+  const GW = W - PL - PR, GH = H - PT - PB;
+
+  const temps  = sorted.map(e => e.temp);
+  const minT   = Math.max(35, Math.floor(Math.min(...temps)) - 0.5);
+  const maxT   = Math.min(42.5, Math.ceil(Math.max(...temps)) + 0.5);
+  const tRange = maxT - minT || 1;
+
+  const xOf = i => PL + (i / (sorted.length - 1)) * GW;
+  const yOf = t => PT + GH - ((t - minT) / tRange) * GH;
+
+  // Build path
+  const pts = sorted.map((e,i) => `${xOf(i).toFixed(1)},${yOf(e.temp).toFixed(1)}`);
+  const linePath = 'M' + pts.join('L');
+
+  // Area fill
+  const areaPath = `M${xOf(0).toFixed(1)},${(PT+GH).toFixed(1)}L${pts.join('L')}L${xOf(sorted.length-1).toFixed(1)},${(PT+GH).toFixed(1)}Z`;
+
+  // Y-axis ticks
+  const yTicks = [];
+  const tickVals = [36, 37, 37.5, 38, 38.5, 39, 40, 41];
+  tickVals.forEach(v => {
+    if (v >= minT && v <= maxT) {
+      const y = yOf(v).toFixed(1);
+      const isRef = v === 38.5;
+      yTicks.push(`
+        <line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}"
+          stroke="${isRef ? 'rgba(248,113,113,.5)' : 'rgba(255,255,255,.07)'}"
+          stroke-width="${isRef ? 1.5 : 1}"
+          stroke-dasharray="${isRef ? '4,3' : ''}"/>
+        <text x="${(PL-4).toFixed(1)}" y="${y}" dy="4"
+          text-anchor="end" fill="rgba(255,255,255,.4)" font-size="9">${v}</text>
+      `);
+    }
+  });
+
+  // X-axis labels (max 6 evenly spaced)
+  const xLabels = [];
+  const step = Math.max(1, Math.ceil(sorted.length / 6));
+  sorted.forEach((e, i) => {
+    if (i % step === 0 || i === sorted.length - 1) {
+      const x = xOf(i).toFixed(1);
+      const d = new Date(e.date + 'T12:00');
+      const lbl = `${d.getDate()}.${d.getMonth()+1}.`;
+      xLabels.push(`<text x="${x}" y="${H-4}" text-anchor="middle"
+        fill="rgba(255,255,255,.35)" font-size="9">${lbl}</text>`);
+    }
+  });
+
+  // Data points
+  const circles = sorted.map((e, i) => {
+    const cx = xOf(i).toFixed(1), cy = yOf(e.temp).toFixed(1);
+    const col = e.temp >= 38.5 ? '#f87171' : e.temp >= 37.5 ? '#fbbf24' : '#34d399';
+    return `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}"
+      stroke="rgba(0,0,0,.6)" stroke-width="1.5"/>`;
+  });
+
+  // 38.5°C label
+  const refY = yOf(38.5).toFixed(1);
+  const refLabel = (38.5 >= minT && 38.5 <= maxT)
+    ? `<text x="${(W-PR+2).toFixed(1)}" y="${refY}" dy="4"
+        fill="rgba(248,113,113,.7)" font-size="8.5" font-weight="600">38.5</text>`
+    : '';
+
+  container.innerHTML = `
+    <svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ff5c3a" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#ff5c3a" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${yTicks.join('')}
+      <path d="${areaPath}" fill="url(#areaGrad)"/>
+      <path d="${linePath}" fill="none" stroke="rgba(255,92,58,.8)" stroke-width="2"
+        stroke-linejoin="round" stroke-linecap="round"/>
+      ${circles.join('')}
+      ${xLabels.join('')}
+      ${refLabel}
+    </svg>`;
+}
+
+// ══════════════════════════════════
+//  WIRKZEIT BANNER
+// ══════════════════════════════════
+const MED_WIRKDAUER_SAFT_H = 8;   // Saft: fest 8 Stunden
+let _wirkTimer = null;
+
+function renderMedBanner(entries) {
+  const banner = document.getElementById('med-banner');
+  clearInterval(_wirkTimer);
+
+  // Find most recent entry with a medication
+  const withMed = [...entries]
+    .filter(e => e.medType !== 'Keines')
+    .sort((a,b) => new Date(b.date+'T'+b.time) - new Date(a.date+'T'+a.time));
+
+  if (!withMed.length) { banner.style.display = 'none'; return; }
+
+  const last = withMed[0];
+  // Wirkzeit: Zäpfchen einstellbar 6–8 h (pro Eintrag, Fallback: gespeicherter Standard),
+  // Saft fest 8 h
+  const wirkH = last.medType === 'Zäpfchen'
+    ? (parseInt(last.wirkh, 10) || getWirkDefault())
+    : MED_WIRKDAUER_SAFT_H;
+  const givenAt  = new Date(last.date + 'T' + last.time);
+  const expiresAt = new Date(givenAt.getTime() + wirkH * 3600000);
+
+  function update() {
+    const now = new Date();
+    const msLeft = expiresAt - now;
+    const pct    = Math.max(0, Math.min(100, (msLeft / (wirkH * 3600000)) * 100));
+
+    let cls, countdown;
+    if (msLeft <= 0) {
+      cls = 'expired';
+      countdown = 'Abgelaufen';
+    } else {
+      const hLeft = Math.floor(msLeft / 3600000);
+      const mLeft = Math.floor((msLeft % 3600000) / 60000);
+      countdown = `${hLeft}h ${String(mLeft).padStart(2,'0')}m`;
+      cls = msLeft < 2 * 3600000 ? 'warning' : 'active';
+    }
+
+    const givenStr = givenAt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+    const expStr   = expiresAt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+    const statusLbl = cls === 'expired' ? 'Wirkzeit abgelaufen' :
+                      cls === 'warning' ? 'Bald abgelaufen' : 'Wirksam bis';
+
+    banner.className = `med-banner ${cls}`;
+    banner.style.display = 'flex';
+    banner.innerHTML = `
+      <div class="med-banner-left">
+        <div class="med-banner-label">Letztes Mittel</div>
+        <div class="med-banner-info">
+          💊 ${escHtml(last.medType)} ${escHtml(last.dose)} ${escHtml(last.active)}
+        </div>
+        <div class="med-banner-time">Gegeben: ${givenStr} · ${statusLbl}: ${expStr}</div>
+        <div class="countdown-bar-wrap">
+          <div class="countdown-bar" style="width:${pct.toFixed(1)}%"></div>
+        </div>
+      </div>
+      <div class="med-banner-countdown">
+        <div class="countdown-val">${msLeft > 0 ? countdown.split('h')[0]+'h' : '—'}</div>
+        <div class="countdown-lbl">${msLeft > 0 ? countdown.split(' ')[1] || '' : 'abgelaufen'}</div>
+      </div>`;
+
+    if (msLeft <= 0) clearInterval(_wirkTimer);
+  }
+
+  update();
+  _wirkTimer = setInterval(update, 30000); // update every 30s
+}
+
+// ══════════════════════════════════
+//  EDIT ENTRY
+// ══════════════════════════════════
+let _editId = null;
+
+function openEditModal(entryId) {
+  const c = active();
+  const e = c.entries.find(x => String(x.id) === String(entryId));
+  if (!e) return;
+  _editId = entryId;
+
+  // Populate fields
+  document.getElementById('e-temp').value = e.temp != null ? e.temp : '';
+  document.getElementById('e-time').value = e.time;
+  document.getElementById('e-date').value = e.date;
+  document.getElementById('e-site').value = e.site;
+  document.getElementById('e-note').value = e.note || '';
+
+  // Med fields
+  const medSel = document.getElementById('e-med');
+  medSel.value = e.medType;
+  onEditMedChange();
+  if (e.medType !== 'Keines') {
+    document.getElementById('e-dose').value   = e.dose;
+    document.getElementById('e-active').value = e.active;
+  }
+  const wrow = document.getElementById('e-wirk-row');
+  if (e.medType === 'Zäpfchen') {
+    wrow.style.display = '';
+    document.getElementById('e-wirk').value = String(e.wirkh || getWirkDefault());
+  } else {
+    wrow.style.display = 'none';
+  }
+
+  document.getElementById('modal-edit').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('modal-edit').classList.remove('open');
+  _editId = null;
+}
+
+function onEditMedChange() {
+  const t = document.getElementById('e-med').value;
+  const d = document.getElementById('e-dose');
+  const a = document.getElementById('e-active');
+  d.innerHTML = a.innerHTML = '';
+  if (t === 'Keines') {
+    d.disabled = a.disabled = true;
+    d.innerHTML = a.innerHTML = '<option value="—">—</option>';
+  } else {
+    d.disabled = a.disabled = false;
+    (t === 'Zäpfchen' ? ['60 mg', '75 mg','125 mg','250 mg'] : ['2,5 ml','3,75 ml','5 ml','7,5 ml'])
+      .forEach(x => d.innerHTML += `<option>${x}</option>`);
+    ['Paracetamol','Ibuprofen'].forEach(x => a.innerHTML += `<option>${x}</option>`);
+  }
+  const wrow = document.getElementById('e-wirk-row');
+  if (t === 'Zäpfchen') {
+    wrow.style.display = '';
+  } else {
+    wrow.style.display = 'none';
+  }
+}
+
+function saveEdit() {
+  const c = active();
+  const e = c.entries.find(x => x.id === _editId);
+  if (!e) return;
+
+  const tempRaw = document.getElementById('e-temp').value;
+  const temp = tempRaw !== '' ? parseFloat(tempRaw) : null;
+  const time = document.getElementById('e-time').value;
+  const date = document.getElementById('e-date').value;
+  const site = document.getElementById('e-site').value;
+  const med  = document.getElementById('e-med').value;
+  const dose = document.getElementById('e-dose').value;
+  const act  = document.getElementById('e-active').value;
+  const note = document.getElementById('e-note').value.trim();
+
+  if (temp !== null && (temp < 34 || temp > 42.5)) { showToast('❌ Gültige Temperatur eingeben'); return; }
+  if (temp === null && med === 'Keines') { showToast('❌ Bitte Temperatur oder Fiebermittel angeben'); return; }
+  if (!time) { showToast('❌ Uhrzeit eingeben'); return; }
+  if (!date) { showToast('❌ Datum eingeben'); return; }
+
+  e.temp    = temp;
+  e.time    = time;
+  e.date    = date;
+  e.site    = site;
+  e.medType = med;
+  e.dose    = med !== 'Keines' ? dose : '—';
+  e.active  = med !== 'Keines' ? act  : '—';
+  e.note    = note;
+  e.wirkh   = med === 'Zäpfchen' ? (parseInt(document.getElementById('e-wirk').value, 10) || getWirkDefault()) : null;
+
+  save();
+  closeEditModal();
+  renderVerlauf();
+  showToast('✏️ Eintrag aktualisiert');
+}
+
+// ══════════════════════════════════
+//  TOAST
+// ══════════════════════════════════
+let _toastTimer = null;
+function showToast(msg) {
+  // FIX Bug4: clear previous timer to avoid race condition
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+// ══════════════════════════════════
+//  PDF EXPORT  —  A4 Querformat
+// ══════════════════════════════════
+function exportPDF() {
+  const c = active();
+  if (!c){showToast('Kein Kind ausgewählt');return;}
+  const rangeH = getRangeHours();
+  const entries = filterByRange(c.entries, rangeH);
+  if (entries.length===0){showToast('Keine Daten zum Exportieren');return;}
+  const rangeLbl = rangeH ? (rangeH<48 ? 'letzte '+rangeH+'h' : 'letzte '+(rangeH/24)+' Tage') : 'Gesamter Verlauf';
+
+  const {jsPDF} = window.jspdf;
+  // A4 landscape: 297 × 210 mm
+  const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+
+  const PW=297, PH=210, ML=12, MR=12;
+  const CW = PW-ML-MR;   // 273 mm usable width
+  const HDR_H = 26, FOOT_H = 11;
+  const now = new Date();
+
+  // colours
+  const K = {
+    dark:[26,20,16], acc:[200,75,47], mut:[120,110,100],
+    lt:[205,196,186], bg:[245,240,235], wh:[255,255,255],
+    gr:[45,106,79], ye:[180,110,10], re:[192,57,43],
+    gbg:[232,244,240], ybg:[254,243,226], rbg:[253,232,230],
+    r1:[252,250,248], r2:[245,241,237],
+  };
+  const F = c=>doc.setFillColor(...c);
+  const T = c=>doc.setTextColor(...c);
+  const S = c=>doc.setDrawColor(...c);
+
+  const exportStr = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    +', '+now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';
+  const dobStr = c.dob
+    ? new Date(c.dob+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    : '';
+
+  function drawHeader(pg, tot) {
+    F(K.dark); doc.rect(0,0,PW,HDR_H,'F');
+    F(K.acc);  doc.roundedRect(ML,6,12,12,2,2,'F');
+    T(K.wh); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text('Fieber Tracker', ML+16, 14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    T([180,170,160]);
+    doc.text('Temperatur  \u00B7  Medikamente  \u00B7  Verlauf', ML+16, 20);
+    // right side: name, dob, export, page
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    T(K.wh); doc.text(c.name, PW-MR, 13, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    T([180,170,160]);
+    let ry = 19;
+    if (dobStr) { doc.text('Geb.: '+dobStr, PW-MR, ry, {align:'right'}); ry+=5; }
+    doc.text('Export: '+exportStr+'   Seite '+pg+' / '+tot, PW-MR, ry, {align:'right'});
+  }
+
+  function drawFooter() {
+    F(K.bg); doc.rect(0,PH-FOOT_H,PW,FOOT_H,'F');
+    S(K.lt); doc.setLineWidth(0.25); doc.line(0,PH-FOOT_H,PW,PH-FOOT_H);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); T(K.mut);
+    doc.text('Vertrauliches Medizinisches Dokument  \u00B7  Fieber Tracker', ML, PH-3.5);
+    doc.text('Dieses Protokoll ersetzt keine \u00e4rztliche Diagnose oder Behandlung.', PW-MR, PH-3.5, {align:'right'});
+  }
+
+  // stats bar (only first page, drawn manually before autoTable)
+  function drawStats(entries, y) {
+    const temps=entries.map(e=>e.temp);
+    const maxT=Math.max(...temps).toFixed(1);
+    const avgT=(temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1);
+    const s2=[...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+    const d1=new Date(s2[0].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const d2=s2.length>1?new Date(s2[s2.length-1].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):d1;
+    const zeitr=s2.length>1?d1+' \u2013 '+d2:d1;
+    const stats=[
+      {v:String(entries.length),l:'Messungen'},
+      {v:maxT+' \u00B0C',l:'H\u00f6chstwert'},
+      {v:avgT+' \u00B0C',l:'Durchschnitt'},
+      {v:zeitr,l:'Zeitraum'},
+    ];
+    F(K.bg); doc.roundedRect(ML,y,CW,15,2,2,'F');
+    S(K.lt); doc.setLineWidth(0.2); doc.roundedRect(ML,y,CW,15,2,2,'S');
+    const sw=CW/4;
+    stats.forEach((s,i)=>{
+      const cx=ML+i*sw+sw/2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); T(K.dark);
+      doc.text(s.v,cx,y+7,{align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); T(K.mut);
+      doc.text(s.l.toUpperCase(),cx,y+12,{align:'center'});
+      if(i<3){S(K.lt);doc.setLineWidth(0.2);doc.line(ML+(i+1)*sw,y+3,ML+(i+1)*sw,y+12);}
+    });
+    return y+20;
+  }
+
+  // ── Temperaturgraph (SVG → Canvas → PNG → PDF)
+  function drawChartOnPage(entries, y, availH) {
+    if (entries.length < 2) return y;
+
+    const sorted = [...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+    const temps  = sorted.map(e=>e.temp);
+    const minT   = Math.max(35, Math.floor(Math.min(...temps) - 0.3));
+    const maxT   = Math.min(42.5, Math.ceil(Math.max(...temps)  + 0.3));
+    const tRange = maxT - minT || 1;
+
+    // Chart area in PDF-mm
+    const CH = Math.min(availH, 52);  // chart height mm
+    const CL = ML, CR = PW - MR;
+    const CW2 = CR - CL;
+    const PL = 14, PR = 6, PT = 6, PB = 16; // inner padding mm
+    const GW = CW2 - PL - PR, GH = CH - PT - PB;
+
+    const xOf = i => CL + PL + (i / Math.max(sorted.length-1,1)) * GW;
+    const yOf = t => y + PT + GH - ((t - minT) / tRange) * GH;
+
+    // Background
+    F(K.bg); doc.roundedRect(CL, y, CW2, CH, 2, 2, 'F');
+    S(K.lt); doc.setLineWidth(0.2); doc.roundedRect(CL, y, CW2, CH, 2, 2, 'S');
+
+    // Title
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); T(K.mut);
+    doc.text('TEMPERATURVERLAUF', CL+PL, y+4);
+
+    // Y-axis gridlines + labels
+    [36,37,37.5,38,38.5,39,40,41].forEach(v => {
+      if (v < minT || v > maxT) return;
+      const gy = yOf(v);
+      const isRef = v === 38.5;
+      S(isRef ? K.re : K.lt);
+      doc.setLineWidth(isRef ? 0.5 : 0.2);
+      if (isRef) {
+        // dashed line manually
+        let dashX = CL + PL;
+        while (dashX < CL + PL + GW) {
+          doc.line(dashX, gy, Math.min(dashX+2.5, CL+PL+GW), gy);
+          dashX += 4;
+        }
+      } else {
+        doc.line(CL+PL, gy, CL+PL+GW, gy);
+      }
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); T(K.mut);
+      doc.text(String(v), CL+PL-1.5, gy+1.5, {align:'right'});
+    });
+
+    // Area fill (light)
+    const areaPoints = [];
+    sorted.forEach((e,i) => areaPoints.push({x:xOf(i), y:yOf(e.temp)}));
+    if (areaPoints.length > 1) {
+      doc.setFillColor(200,75,47);
+      // Draw polygon manually via lines
+      doc.setLineWidth(0);
+    }
+
+    // Line
+    S(K.acc); doc.setLineWidth(1.2);
+    for (let i=1; i<sorted.length; i++) {
+      doc.line(xOf(i-1), yOf(sorted[i-1].temp), xOf(i), yOf(sorted[i].temp));
+    }
+
+    // Data points
+    sorted.forEach((e,i) => {
+      const cx = xOf(i), cy = yOf(e.temp);
+      const col = e.temp>=38.5 ? K.re : e.temp>=37.5 ? K.ye : K.gr;
+      F(col); S([255,255,255]); doc.setLineWidth(0.4);
+      doc.circle(cx, cy, 1.4, 'FD');
+    });
+
+    // X-axis date labels
+    const step = Math.max(1, Math.ceil(sorted.length/8));
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); T(K.mut);
+    sorted.forEach((e,i) => {
+      if (i % step !== 0 && i !== sorted.length-1) return;
+      const d = new Date(e.date+'T12:00');
+      const lbl = `${d.getDate()}.${d.getMonth()+1}.`;
+      doc.text(lbl, xOf(i), y+CH-2, {align:'center'});
+    });
+
+    // 38.5°C label
+    if (38.5 >= minT && 38.5 <= maxT) {
+      T(K.re); doc.setFont('helvetica','bold'); doc.setFontSize(6);
+      doc.text('38.5', CL+PL+GW+1, yOf(38.5)+1.5);
+    }
+
+    return y + CH + 4;
+  }
+
+  // Build table data
+  const sorted=[...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+  const head=[['#','Datum','Uhrzeit','Temp. °C','Bewertung','Messort','Mittel','Menge','Wirkstoff','Notiz']];
+  const body=sorted.map((e,i)=>{
+    const ds=new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const hasTemp=e.temp!==null&&e.temp!==undefined;
+    return [String(i+1), ds, e.time+' Uhr', hasTemp?e.temp.toFixed(1):'—',
+      hasTemp?getTI(e.temp).label:'Ohne Messung', e.site, e.medType, e.dose, e.active, e.note||''];
+  });
+
+  // Draw first page header + stats + chart
+  drawHeader(1,1);
+  let startY = drawStats(entries, HDR_H+2);
+  // Available height for chart before table
+  const chartAvailH = PH - startY - FOOT_H - 55; // leave ~55mm for table header
+  if (entries.length >= 2 && chartAvailH > 30) {
+    startY = drawChartOnPage(entries, startY, chartAvailH);
+  }
+
+  // Column widths — must sum to CW = 273
+  // #(7) Datum(22) Uhrzeit(19) Temp(16) Bewertung(28) Messort(26) Mittel(20) Menge(18) Wirkstoff(24) Notiz(rest=93)
+  const CWS = [12,22,19,16,28,26,20,18,24,88]; // col 0: 7→12, Notiz angepasst (Summe bleibt 273)
+
+  doc.autoTable({
+    startY,
+    head,
+    body,
+    margin:{left:ML, right:MR, bottom:FOOT_H+2},
+    tableWidth: CW,
+    styles:{
+      font:'helvetica', fontSize:8.5,
+      cellPadding:{top:3.5,bottom:3.5,left:2.5,right:2.5},
+      lineColor:K.lt, lineWidth:0.25,
+      textColor:K.dark, overflow:'linebreak',
+    },
+    headStyles:{
+      fillColor:K.dark, textColor:K.wh,
+      fontStyle:'bold', fontSize:7.5,
+      cellPadding:{top:4,bottom:4,left:2.5,right:2.5},
+    },
+    alternateRowStyles:{fillColor:K.r2},
+    bodyStyles:{fillColor:K.r1},
+    columnStyles:{
+      0:{cellWidth:CWS[0],halign:'center',textColor:K.mut,fontSize:7},
+      1:{cellWidth:CWS[1]},
+      2:{cellWidth:CWS[2]},
+      3:{cellWidth:CWS[3],fontStyle:'bold',halign:'center'},
+      4:{cellWidth:CWS[4]},
+      5:{cellWidth:CWS[5]},
+      6:{cellWidth:CWS[6]},
+      7:{cellWidth:CWS[7]},
+      8:{cellWidth:CWS[8]},
+      9:{cellWidth:CWS[9],fontSize:7.5},
+    },
+    didParseCell(d){
+      if(d.section!=='body') return;
+      if(d.column.index===3){
+        const t=parseFloat(d.cell.raw);
+        if(!isNaN(t)) d.cell.styles.textColor = t>=38.5?K.re:t>=37.5?K.ye:K.gr;
+      }
+      if(d.column.index===4){
+        const v=d.cell.raw;
+        d.cell.styles.textColor = v==='Fieber'?K.re:v==='Erhöhte Temp.'?K.ye:K.gr;
+      }
+    },
+    // Suppress autoTable's own header on first page (we drew it manually)
+    // On subsequent pages didDrawPage fires first
+    didDrawPage(data){
+      const pg = data.pageNumber;
+      const tot = doc.internal.getNumberOfPages();
+      drawHeader(pg, tot);
+      drawFooter();
+    },
+  });
+
+  // Patch correct total pages into all headers
+  const total = doc.internal.getNumberOfPages();
+  for(let p=1;p<=total;p++){
+    doc.setPage(p);
+    drawHeader(p,total);
+    drawFooter();
+    // Re-draw stats on page 1 (autoTable may have drawn over it — it hasn't, but belt+suspenders)
+    if(p===1) {
+      let ry = drawStats(entries, HDR_H+2);
+      const ch2 = PH - ry - FOOT_H - 55;
+      if (entries.length >= 2 && ch2 > 30) drawChartOnPage(entries, ry, ch2);
+    }
+  }
+
+  const rangeTag = rangeH ? (rangeH<48 ? rangeH+'h' : (rangeH/24)+'T') : 'gesamt';
+  const fname = c.name.replace(/\s+/g,'_')+'_Fieber_Protokoll_'+now.toISOString().slice(0,10)+'_'+rangeTag+'.pdf';
+  doc.save(fname);
+  showToast('📄 PDF für '+c.name+' exportiert');
+}
+
+// ══════════════════════════════════
+//  BUILD PRINT PAGE
+// ══════════════════════════════════
+function buildPrintPage() {
+  const c = active();
+  const pp = document.getElementById('print-page');
+  if (!c) { pp.innerHTML = ''; return; }
+  const rangeH = getRangeHours();
+  const entries = filterByRange(c.entries, rangeH);
+  if (entries.length === 0) { pp.innerHTML = ''; return; }
+
+  const now = new Date();
+  const exportStr = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    + ', ' + now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+  const dobStr = c.dob
+    ? new Date(c.dob+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    : '';
+
+  const temps   = entries.filter(e => e.temp != null).map(e => e.temp);
+  const maxT    = temps.length ? Math.max(...temps).toFixed(1) : '—';
+  const avgT    = temps.length ? (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1) : '—';
+  const s2      = [...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+  const d1      = new Date(s2[0].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const d2      = s2.length>1 ? new Date(s2[s2.length-1].date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : d1;
+  const zeitr   = s2.length>1 ? d1+' – '+d2 : d1;
+
+  const sorted = [...entries].sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+
+  const rows = sorted.map((e,i) => {
+    const hasTemp = e.temp != null;
+    const info = hasTemp ? getTI(e.temp) : {label:'Ohne Messung'};
+    const colorCls = hasTemp ? (e.temp>=38.5?'re':e.temp>=37.5?'ye':'gr') : '';
+    const ds = new Date(e.date+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td>${ds}</td>
+      <td>${e.time} Uhr</td>
+      <td class="temp ${colorCls}">${hasTemp ? e.temp.toFixed(1)+' &deg;C' : '—'}</td>
+      <td class="${colorCls}">${info.label}</td>
+      <td>${e.site}</td>
+      <td>${e.medType !== 'Keines' ? e.medType : '<span style=\'color:#aaa\'>—</span>'}</td>
+      <td>${e.medType !== 'Keines' ? e.dose : '—'}</td>
+      <td>${e.medType !== 'Keines' ? e.active : '—'}</td>
+      <td class="note">${e.note || ''}</td>
+    </tr>`;
+  }).join('');
+
+  pp.innerHTML = `
+    <div class="ph">
+      <div class="ph-left">
+        <div class="ph-badge">&#127777;&#65039;</div>
+        <div>
+          <div class="ph-title">Fieber Tracker</div>
+          <div class="ph-sub">Temperatur &middot; Medikamente &middot; Verlauf</div>
+        </div>
+      </div>
+      <div class="ph-right">
+        <div class="ph-name">${c.name}</div>
+        <div class="ph-meta">${dobStr ? 'Geb.: '+dobStr+'&nbsp;&nbsp;' : ''}Export: ${exportStr}</div>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-item"><span class="ps-val">${entries.length}</span><span class="ps-lbl">Messungen</span></div>
+      <div class="ps-item"><span class="ps-val">${maxT} &deg;C</span><span class="ps-lbl">H&ouml;chstwert</span></div>
+      <div class="ps-item"><span class="ps-val">${avgT} &deg;C</span><span class="ps-lbl">Durchschnitt</span></div>
+      <div class="ps-item"><span class="ps-val" style="font-size:9pt">${zeitr}</span><span class="ps-lbl">Zeitraum</span></div>
+    </div>
+
+    <table class="pt">
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Datum</th>
+          <th>Uhrzeit</th>
+          <th class="num">Temp. &deg;C</th>
+          <th>Bewertung</th>
+          <th>Messort</th>
+          <th>Mittel</th>
+          <th>Menge</th>
+          <th>Wirkstoff</th>
+          <th>Notiz</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="pf">
+      <span>Vertrauliches Medizinisches Dokument &middot; Fieber Tracker</span>
+      <span>Dieses Protokoll ersetzt keine &auml;rztliche Diagnose oder Behandlung.</span>
+    </div>
+  `;
+}
+
+window.addEventListener('beforeprint', () => {
+  buildPrintPage();
+  document.getElementById('print-page').style.display = 'block';
+});
+window.addEventListener('afterprint', () => {
+  document.getElementById('print-page').style.display = 'none';
+});
+
+if ('serviceWorker' in navigator &&
+    (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
