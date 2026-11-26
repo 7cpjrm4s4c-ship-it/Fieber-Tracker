@@ -1,4 +1,4 @@
-const CACHE_STATIC  = 'ft-static-v5';   // app shell — versioned, replace on update
+const CACHE_STATIC  = 'ft-static-v6';   // app shell — versioned, replace on update
 const CACHE_RUNTIME = 'ft-runtime-v1';  // CDN libs — long-lived, stale-while-revalidate
 
 const STATIC_ASSETS = [

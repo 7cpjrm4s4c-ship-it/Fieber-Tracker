@@ -474,18 +474,25 @@ function renderMedBanner(entries) {
     banner.style.display = 'flex';
     banner.innerHTML = `
       <div class="med-banner-left">
-        <div class="med-banner-label">Letztes Mittel</div>
-        <div class="med-banner-info">
-          💊 ${escHtml(last.medType)} ${escHtml(last.dose)} ${escHtml(last.active)}
+        <div class="med-banner-label">💊 Wirkzeit · ${escHtml(last.medType)}</div>
+        <div class="med-banner-info">${escHtml(last.dose)} · ${escHtml(last.active)}</div>
+        <div class="med-banner-times">
+          <div class="med-banner-titem">
+            <span class="med-banner-tlbl">Gegeben</span>
+            <span class="med-banner-tval">${givenStr}</span>
+          </div>
+          <div class="med-banner-titem">
+            <span class="med-banner-tlbl">${statusLbl}</span>
+            <span class="med-banner-tval">${expStr}</span>
+          </div>
         </div>
-        <div class="med-banner-time">Gegeben: ${givenStr} · ${statusLbl}: ${expStr}</div>
         <div class="countdown-bar-wrap">
           <div class="countdown-bar" style="width:${pct.toFixed(1)}%"></div>
         </div>
       </div>
       <div class="med-banner-countdown">
         <div class="countdown-val">${msLeft > 0 ? countdown.split('h')[0]+'h' : '—'}</div>
-        <div class="countdown-lbl">${msLeft > 0 ? countdown.split(' ')[1] || '' : 'abgelaufen'}</div>
+        <div class="countdown-lbl">${msLeft > 0 ? (countdown.split(' ')[1] || '') + ' übrig' : 'abgelaufen'}</div>
       </div>`;
 
     if (msLeft <= 0) clearInterval(_wirkTimer);
