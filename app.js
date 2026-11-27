@@ -15,9 +15,9 @@ function escHtml(str) {
 //  FESTE KINDER (direkt im Code)
 // ══════════════════════════════════
 const FIXED_CHILDREN = [
-  { id: 'child-leni', name: 'Leni', emoji: '👧', avCls: 'av0' },
-  { id: 'child-rosa', name: 'Rosa', emoji: '👶', avCls: 'av1' },
-  { id: 'child-ben',  name: 'Ben',  emoji: '👦', avCls: 'av2' },
+  { id: 'child-leni', name: 'Leni', emoji: '👧🏻', avCls: 'av0' },
+  { id: 'child-rosa', name: 'Rosa', emoji: '👶🏻', avCls: 'av1' },
+  { id: 'child-ben',  name: 'Ben',  emoji: '👦🏻', avCls: 'av2' },
 ];
 
 // ══════════════════════════════════
