@@ -612,3 +612,207 @@ select { padding-right: 30px; cursor: pointer; color-scheme: dark }
   .fg2,.fg3 { grid-template-columns:1fr }
   .stats { grid-template-columns:1fr 1fr }
 }
+
+/* ── TEMPERATURGRAPH ── */
+.chart-wrap {
+  padding: 14px 14px 6px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.chart-title {
+  font-size: 11px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: .9px; margin-bottom: 10px;
+}
+
+.chart-svg {
+  width: 100%; overflow: visible; display: block;
+}
+
+.chart-empty {
+  text-align: center; padding: 24px 0;
+    font-size: 12px; color: var(--muted);
+}
+
+/* ── WIRKZEIT BANNER ── */
+.med-banner {
+  margin-bottom: 12px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 12px;
+    position: relative; overflow: hidden;
+}
+
+.med-banner::before {
+  content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent,
+    rgba(255,255,255,.2), transparent);
+}
+
+.med-banner.active {
+  border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.08);
+}
+
+.med-banner.warning {
+  border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.08);
+}
+
+.med-banner.expired {
+  border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.08);
+}
+
+.med-banner-left {
+  display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+}
+
+.med-banner-label {
+  font-size: 11px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .8px;
+}
+
+.med-banner-info {
+  font-size: 14px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.med-banner-time {
+  font-size: 12px; color: var(--muted); margin-top: 1px;
+}
+
+.med-banner-countdown {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    flex-shrink: 0;
+}
+
+.countdown-val {
+  font-size: 22px; font-weight: 700; letter-spacing: -.5px; line-height: 1;
+}
+
+.countdown-lbl {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .7px;
+}
+
+.countdown-bar-wrap {
+  width: 100%; height: 3px;
+    background: rgba(255,255,255,.1);
+    border-radius: 2px; margin-top: 8px; overflow: hidden;
+}
+
+.countdown-bar {
+  height: 100%; border-radius: 2px; transition: width 1s linear;
+}
+
+.med-banner.active  .countdown-bar {
+  background: var(--green);
+}
+
+.med-banner.warning .countdown-bar {
+  background: var(--yellow);
+}
+
+.med-banner.expired .countdown-bar {
+  background: var(--red);
+}
+
+.med-banner.active  .countdown-val {
+  color: var(--green);
+}
+
+.med-banner.warning .countdown-val {
+  color: var(--yellow);
+}
+
+.med-banner.expired .countdown-val {
+  color: var(--red);
+}
+
+.modal-edit-inner {
+  max-height: 90vh; overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.modal-section-title {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .9px;
+    margin: 14px 0 8px;
+}
+
+.modal-section-title:first-child {
+  margin-top: 0;
+}
+
+.edit-fg2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+
+.edit-fg3 {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+}
+
+.edit-fg {
+  display: flex; flex-direction: column; gap: 5px;
+}
+
+.edit-fg label {
+  font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px;
+}
+
+.edit-fg input, .edit-fg select, .edit-fg textarea {
+  font-family: inherit; font-size: 16px; color: var(--text);
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    border-radius: var(--radius-xs); padding: 9px 11px; outline: none;
+    transition: border-color .18s; -webkit-appearance: none; appearance: none;
+    width: 100%; color-scheme: dark;
+}
+
+.edit-fg input:focus, .edit-fg select:focus, .edit-fg textarea:focus {
+  border-color: var(--input-focus-border);
+    background: rgba(255,255,255,.11);
+}
+
+.edit-sw {
+  position: relative;
+}
+
+.edit-sw::after {
+  content:'▾'; position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; font-size:12px;
+}
+
+.edit-sw select {
+  padding-right: 28px; cursor: pointer;
+}
+
+.edit-tw {
+  position: relative;
+}
+
+.edit-tw input {
+  font-size: 18px; font-weight: 500; padding-right: 38px;
+}
+
+.edit-tu {
+  position:absolute; right:11px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:13px; font-weight:500;
+}
+
+/* ── WIRKZEIT CARD — Ergänzungen ── */
+.med-banner-times {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-top: 8px;
+}
+.med-banner-titem { display: flex; flex-direction: column; gap: 1px; }
+.med-banner-tlbl {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .7px;
+}
+.med-banner-tval {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+
